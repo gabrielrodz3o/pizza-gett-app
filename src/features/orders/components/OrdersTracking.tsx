@@ -8,6 +8,16 @@ import { OrderDetailModal } from './OrderDetailModal';
 
 const money=(v:number)=>`RD$${v.toLocaleString('es-DO',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const fallback=<Ionicons name="pizza-outline" size={24} color={colors.brown}/>;
+const orderDate=(order:any)=>{
+  if(order.created_at_format)return order.created_at_format;
+  const raw=String(order.created_at||'').trim();
+  if(!raw)return '';
+  const normalized=raw.replace(' ','T').replace(/(\.\d{3})\d+/,'$1');
+  const hasTimezone=/(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized);
+  const parsed=new Date(hasTimezone?normalized:`${normalized}Z`);
+  if(Number.isNaN(parsed.getTime()))return raw;
+  return parsed.toLocaleString('es-DO',{timeZone:'America/Santo_Domingo',day:'numeric',month:'short',hour:'numeric',minute:'2-digit'});
+};
 
 export function OrdersTracking({session,loading,orders,onLogin,onRetry,onReorder}:{session:boolean;loading:boolean;orders:any[];onLogin:()=>void;onRetry:()=>void;onReorder:(order:any)=>void}){
   const [selectedOrder,setSelectedOrder]=useState<number|null>(null);
@@ -26,7 +36,7 @@ export function OrdersTracking({session,loading,orders,onLogin,onRetry,onReorder
 function OrderCard({order,active=false,onPress,onReorder}:{order:any;active?:boolean;onPress:()=>void;onReorder:()=>void}){
   const stages=orderStages(Boolean(order.is_delivery)),progress=orderProgress(order),cancelled=isCancelledOrder(order),preview=Array.isArray(order.item_preview)?order.item_preview:[];
   return <Pressable onPress={onPress} style={({pressed})=>[s.card,active&&s.activeCard,pressed&&{opacity:.86}]}>
-    <View style={s.top}><View style={{flex:1}}><Text style={s.number}>Orden {order.order_code||`#${order.account_id}`}</Text><Text style={s.date}>{new Date(order.created_at).toLocaleString('es-DO',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'})} · {order.location_name||'Pizza Getto'}</Text></View><View style={[s.badge,cancelled&&s.cancelBadge]}><View style={[s.statusDot,cancelled&&{backgroundColor:colors.red}]}/><Text style={[s.badgeText,cancelled&&{color:colors.red}]}>{order.status_name||'Recibido'}</Text></View></View>
+    <View style={s.top}><View style={{flex:1}}><Text style={s.number}>Orden {order.order_code||`#${order.account_id}`}</Text><Text style={s.date}>{orderDate(order)} · {order.location_name||'Pizza Getto'}</Text></View><View style={[s.badge,cancelled&&s.cancelBadge]}><View style={[s.statusDot,cancelled&&{backgroundColor:colors.red}]}/><Text style={[s.badgeText,cancelled&&{color:colors.red}]}>{order.status_name||'Recibido'}</Text></View></View>
     {active&&!cancelled&&<><Text style={s.eta}>{orderEta(order)}</Text><View style={s.timeline}>{stages.map((stage,index)=>{const done=index<progress,current=index===progress-1;return <View key={stage.key} style={s.stage}><View style={[s.stageIcon,done&&s.stageDone,current&&s.stageCurrent]}><Ionicons name={stage.icon as any} size={15} color={done?'white':colors.muted}/></View>{index<stages.length-1&&<View style={[s.stageLine,done&&index<progress-1&&s.stageLineDone]}/>}<Text style={[s.stageLabel,current&&s.stageLabelCurrent]} numberOfLines={1}>{stage.label}</Text></View>})}</View></>}
     <View style={s.products}>{preview.length?preview.map((item:any,index:number)=><View key={`${item.item_id}-${index}`} style={s.thumb}>{item.item_image_url?<Image source={{uri:item.item_image_url}} style={s.thumbImage}/>:fallback}</View>):<View style={s.thumb}>{fallback}</View>}<View style={{flex:1}}><Text style={s.productSummary}>{Number(order.item_count)||preview.length} {Number(order.item_count)===1?'producto':'productos'}</Text><Text style={s.productNames} numberOfLines={1}>{preview.map((x:any)=>`${x.quantity}× ${x.item_name}`).join(' · ')||'Ver detalle del pedido'}</Text></View><Text style={s.price}>{money(Number(order.subtotal||0)+Number(order.delivery_cost||0))}</Text></View>
     <View style={s.bottom}><View style={s.mode}><Ionicons name={order.is_delivery?'bicycle-outline':'bag-handle-outline'} size={15} color={colors.brown}/><Text style={s.modeText}>{order.is_delivery?'Delivery':'Recogida'}</Text></View><Pressable onPress={e=>{e.stopPropagation();onReorder();}} style={s.reorder}><Ionicons name="repeat" size={15} color={colors.brown}/><Text style={s.reorderText}>Volver a pedir</Text></Pressable><View style={s.detail}><Text style={s.detailText}>Ver detalle</Text><Ionicons name="chevron-forward" size={16} color={colors.brown}/></View></View>
