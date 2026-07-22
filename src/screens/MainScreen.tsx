@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from "expo-linear-gradient";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,7 +28,7 @@ import { useCustomerAuth } from "@/features/auth/store";
 import { DeliveryAddress, getOrderDetail, redeemLoyaltyReward } from "@/features/customer/api";
 import { AddressesModal } from "@/features/customer/components/AddressesModal";
 import { colors, shadow } from "@/shared/theme";
-import { Branch, Product } from "@/shared/types";
+import { Branch,Campaign, Product } from "@/shared/types";
 import { OrdersTracking as OrdersTrackingFeature } from "@/features/orders/components/OrdersTracking";
 import { ProfileContent } from "@/features/customer/components/ProfileContent";
 import { usePendingOrderRecovery } from '@/features/orders/usePendingOrderRecovery';
@@ -58,6 +59,7 @@ export default function App() {
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("home");
   const [category, setCategory] = useState("Todos");
   const [campaignItemIds, setCampaignItemIds] = useState<number[] | null>(null);
+  const [selectedCampaignId,setSelectedCampaignId]=useState<number|null>(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<Product | null>(null);
@@ -78,7 +80,7 @@ export default function App() {
   }, []);
   const selectTab = (next: (typeof tabs)[number]['id']) => {
     setTab(next);
-    if (next !== 'menu') { setCategory('Todos'); setCampaignItemIds(null); setSearch(''); }
+    if (next !== 'menu') { setCategory('Todos'); setCampaignItemIds(null);setSelectedCampaignId(null); setSearch(''); }
     requestAnimationFrame(() => mainScrollRef.current?.scrollTo({ y: 0, animated: false }));
     void AsyncStorage.setItem('pizza-getto-last-tab', next);
   };
@@ -88,6 +90,7 @@ export default function App() {
   const visibleTabs = loyaltyProgram ? tabs : tabs.filter((item) => item.id !== 'rewards');
   useEffect(() => { if (!loyaltyProgram && tab === 'rewards' && !configQuery.isLoading) selectTab('home'); }, [loyaltyProgram,tab,configQuery.isLoading]);
   const campaigns = (configQuery.data?.campaigns ?? []).filter((campaign) => !campaign.locationId || campaign.locationId === branch?.id);
+  const selectedCampaign=campaigns.find(campaign=>campaign.id===selectedCampaignId);
   const addresses: DeliveryAddress[] = customerQuery.data?.addresses ?? [];
   const selectedAddress = addresses.find((x) => x.id === shop.selectedAddressId);
   const products = query.data?.products ?? [];
@@ -125,10 +128,27 @@ export default function App() {
       const deliveryAddress = addresses.find((address) => Number(address.effective_location_id) === target.id);
       if (order.is_delivery && deliveryAddress) shop.chooseService('delivery', target.id, deliveryAddress.id);
       else shop.chooseService('pickup', target.id);
-      available.forEach((item: any) => shop.add(byId.get(Number(item.item_id))!, { quantity: Math.max(1, Number(item.quantity) || 1) }));
+      let changedCustomizations = 0;
+      available.forEach((item: any) => {
+        const product = byId.get(Number(item.item_id))!;
+        const currentSides = new Map((product.sidesCategories ?? []).flatMap((category) => category.sides).map((side) => [side.id, side]));
+        const selectedById = new Map<number, { id:number;name:string;itemId?:number|null;price:number;quantity:number }>();
+        for (const previousSide of (item.side_types ?? []).flatMap((type: any) => type.sides ?? [])) {
+          const current = currentSides.get(Number(previousSide.id));
+          if (!current) { changedCustomizations += 1; continue; }
+          const selected = selectedById.get(current.id);
+          if (selected) selected.quantity += 1;
+          else selectedById.set(current.id, { id: current.id, name: current.name, itemId: current.item_id, price: current.price, quantity: 1 });
+        }
+        shop.add(product, {
+          quantity: Math.max(1, Number(item.quantity) || 1),
+          note: String(item.item_note ?? '').trim() || undefined,
+          selectedSides: [...selectedById.values()],
+        });
+      });
       const missing = previous.length - available.length;
       setCartOpen(true);
-      if (missing > 0) Alert.alert('Carrito actualizado', `${missing} producto${missing === 1 ? '' : 's'} ya no estaba disponible y no fue agregado.`);
+      if (missing > 0 || changedCustomizations > 0) Alert.alert('Carrito actualizado', [missing > 0 ? `${missing} producto${missing === 1 ? '' : 's'} ya no estaba disponible.` : '', changedCustomizations > 0 ? `${changedCustomizations} opción${changedCustomizations === 1 ? '' : 'es'} ya no existe y fue omitida.` : '', 'Los precios y promociones fueron recalculados con el menú actual.'].filter(Boolean).join('\n'));
     } catch (error: any) { Alert.alert('No pudimos repetirlo', error?.response?.data?.message || 'Actualiza e intenta nuevamente.'); }
   };
 
@@ -211,18 +231,7 @@ export default function App() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshAll} tintColor={colors.yellow} colors={[colors.yellow]} />}
       >
-        {tab === "home" && campaigns.length > 0 && (
-          <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={s.campaigns}>
-            {campaigns.map((campaign) => <Pressable key={campaign.id} accessibilityRole="button" accessibilityLabel={`${campaign.name}. ${campaign.ctaLabel}`} onPress={() => { selectTab('menu'); setCampaignItemIds(campaign.itemIds); setCategory('Ofertas'); }} style={s.campaignCard}>
-              <Image source={{ uri: campaign.bannerUrl }} accessibilityLabel={campaign.altText} style={s.campaignImage} />
-              <LinearGradient colors={['rgba(30,8,8,.08)','rgba(30,8,8,.92)']} style={s.campaignShade}>
-                <View style={s.campaignBadge}><Ionicons name="pricetag" size={12} color="white"/><Text style={s.campaignBadgeText}>{campaign.type === 'DISCOUNT_PERCENTAGE' ? `${campaign.discountPercentage}% DE DESCUENTO` : 'OFERTA ESPECIAL'}</Text></View>
-                <View style={s.campaignBottom}><Text style={s.campaignTitle} numberOfLines={2}>{campaign.name}</Text><Text style={s.campaignDescription} numberOfLines={1}>{campaign.description || `${campaign.itemIds.length} productos seleccionados`}</Text>
-                <View style={s.campaignCta}><Text style={s.campaignCtaText}>Ver productos</Text><Ionicons name="arrow-forward" size={15} color={colors.brown} /></View></View>
-              </LinearGradient>
-            </Pressable>)}
-          </ScrollView>
-        )}
+        {tab === "home" && campaigns.length > 0 && <OfferCarousel campaigns={campaigns} onSelect={(campaign)=>{selectTab('menu');setSelectedCampaignId(campaign.id);setCampaignItemIds(campaign.itemIds);setCategory('Ofertas');}}/>}
         {tab === "home" && campaigns.length === 0 && (
           <View style={s.greeting}>
             <Text style={s.title}>¡Hola! 👋</Text>
@@ -246,7 +255,8 @@ export default function App() {
               <View style={{ flex: 1 }}><Text style={s.availabilityTitle}>{branch.open ? `${shop.serviceMode === 'delivery' ? 'Delivery' : 'Recogida'} disponible` : 'Sucursal cerrada'}</Text><Text style={s.availabilityText}>{branch.eta} · Actualizado {lastUpdated.toLocaleTimeString('es-DO', { hour: 'numeric', minute: '2-digit' })}</Text></View>
               <Pressable accessibilityRole="button" accessibilityLabel="Actualizar disponibilidad" onPress={refreshAll} hitSlop={10}><Ionicons name="refresh" size={19} color={colors.brown} /></Pressable>
             </View>
-            <View style={s.search}>
+            {campaignItemIds&&<View style={s.offerContext}><View style={s.offerContextIcon}><Ionicons name="pricetag" size={20} color="white"/></View><View style={{flex:1}}><Text style={s.offerContextKicker}>OFERTA SELECCIONADA</Text><Text style={s.offerContextTitle}>{selectedCampaign?.name||'Productos en promoción'}</Text><Text style={s.offerContextSub}>{shown.length} {shown.length===1?'producto disponible':'productos disponibles'} · Precios vigentes</Text></View><Pressable accessibilityLabel="Cerrar oferta" onPress={()=>{setCampaignItemIds(null);setSelectedCampaignId(null);setCategory('Todos');}} style={s.offerClose}><Ionicons name="close" size={19} color={colors.brown}/></Pressable></View>}
+            {!campaignItemIds&&<><View style={s.search}>
               <Ionicons name="search" size={20} color={colors.muted} />
               <TextInput
                 value={search}
@@ -266,7 +276,7 @@ export default function App() {
               {categories.map((x) => (
                 <Pressable
                   key={x}
-                  onPress={() => { setCampaignItemIds(null); setCategory(x); }}
+                  onPress={() => { setCampaignItemIds(null);setSelectedCampaignId(null); setCategory(x); }}
                   style={[s.chip, category === x && s.chipActive]}
                 >
                   <Text
@@ -276,10 +286,10 @@ export default function App() {
                   </Text>
                 </Pressable>
               ))}
-            </ScrollView>
+            </ScrollView></>}
             <View style={s.sectionHead}>
               <Text style={s.sectionTitle}>
-                {category === "Favoritos"
+                {campaignItemIds ? (shown.length===1?'Tu producto en oferta':'Productos de esta oferta') : category === "Favoritos"
                   ? "Tus favoritos"
                   : tab === "home"
                     ? "Los más pedidos"
@@ -341,6 +351,7 @@ export default function App() {
                   <ProductCard
                     key={p.id}
                     product={p}
+                    featured={Boolean(campaignItemIds&&shown.length===1)}
                     onOpen={(product) =>
                       product.itemTypeId === 3
                         ? setSelectedCombo(product)
@@ -523,24 +534,41 @@ function ServiceSelect({ branches, addresses, authenticated, loading, error, onR
   </ScrollView></SafeAreaView>;
 }
 
+function OfferCarousel({campaigns,onSelect}:{campaigns:Campaign[];onSelect:(campaign:Campaign)=>void}){
+  const {width}=useWindowDimensions();
+  const cardWidth=Math.max(280,width-36);
+  const ref=useRef<ScrollView>(null);
+  const [index,setIndex]=useState(0);
+  const [interacting,setInteracting]=useState(false);
+  useEffect(()=>{if(campaigns.length<2||interacting)return;const timer=setInterval(()=>setIndex(current=>{const next=(current+1)%campaigns.length;ref.current?.scrollTo({x:next*(cardWidth+12),animated:true});return next;}),5000);return()=>clearInterval(timer);},[campaigns.length,cardWidth,interacting]);
+  useEffect(()=>{if(index>=campaigns.length)setIndex(0);},[campaigns.length,index]);
+  return <View style={s.carouselWrap}><ScrollView ref={ref} horizontal snapToInterval={cardWidth+12} decelerationRate="fast" disableIntervalMomentum showsHorizontalScrollIndicator={false} contentContainerStyle={s.campaigns} onScrollBeginDrag={()=>setInteracting(true)} onScrollEndDrag={()=>setInteracting(false)} onMomentumScrollEnd={event=>{setIndex(Math.round(event.nativeEvent.contentOffset.x/(cardWidth+12)));setInteracting(false);}}>
+    {campaigns.map(campaign=><Pressable key={campaign.id} accessibilityRole="button" accessibilityLabel={`${campaign.name}. Ver productos`} onPress={()=>onSelect(campaign)} style={[s.campaignCard,{width:cardWidth}]}>
+      <Image source={{uri:campaign.bannerUrl}} accessibilityLabel={campaign.altText} style={s.campaignImage}/><LinearGradient colors={['rgba(30,8,8,.08)','rgba(30,8,8,.92)']} style={s.campaignShade}><View style={s.campaignBadge}><Ionicons name="pricetag" size={12} color="white"/><Text style={s.campaignBadgeText}>{campaign.type==='DISCOUNT_PERCENTAGE'?`${campaign.discountPercentage}% DE DESCUENTO`:'OFERTA ESPECIAL'}</Text></View><View style={s.campaignBottom}><Text style={s.campaignTitle} numberOfLines={2}>{campaign.name}</Text><Text style={s.campaignDescription} numberOfLines={1}>{campaign.description||`${campaign.itemIds.length} productos seleccionados`}</Text><View style={s.campaignCta}><Text style={s.campaignCtaText}>Ver productos</Text><Ionicons name="arrow-forward" size={15} color={colors.brown}/></View></View></LinearGradient>
+    </Pressable>)}
+  </ScrollView>{campaigns.length>1&&<View style={s.carouselDots}>{campaigns.map((campaign,dot)=><Pressable key={campaign.id} accessibilityLabel={`Ir a oferta ${dot+1}`} onPress={()=>{setIndex(dot);ref.current?.scrollTo({x:dot*(cardWidth+12),animated:true});}} style={[s.carouselDot,dot===index&&s.carouselDotActive]}/>)}</View>}</View>;
+}
+
 function ProductCard({
   product,
   onOpen,
+  featured=false,
 }: {
   product: Product;
   onOpen: (p: Product) => void;
+  featured?:boolean;
 }) {
   const shop = useShop();
   const fav = shop.favorites.includes(product.id);
   return (
     <Pressable
-      style={[s.productCard, product.promotion && s.promotedCard]}
+      style={[s.productCard,featured&&s.featuredProductCard, product.promotion && s.promotedCard]}
       onPress={() => onOpen(product)}
     >
       {product.image ? (
-        <Image source={{ uri: product.image }} style={s.productImage} />
+        <Image source={{ uri: product.image }} style={[s.productImage,featured&&s.featuredProductImage]} />
       ) : (
-        <View style={[s.productImage, s.imagePlaceholder]}>
+        <View style={[s.productImage,featured&&s.featuredProductImage, s.imagePlaceholder]}>
           <Ionicons name="pizza-outline" size={38} color={colors.brown} />
         </View>
       )}
@@ -627,7 +655,6 @@ function Cart({
   const [paymentMethodId, setPaymentMethodId] = useState(branch.paymentMethods?.[0]?.id ?? 1);
   const [sending, setSending] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [scheduledFor, setScheduledFor] = useState<string | null>(null);
   const addresses = customer?.addresses ?? [];
   useEffect(() => {
     if (!addressId && addresses[0]?.id) {
@@ -638,13 +665,6 @@ function Cart({
   const selectedAddress = addresses.find((x: any) => x.id === addressId);
   const delivery = deliveryType === "delivery" ? Number(selectedAddress?.detected_zone_price ?? 0) : 0;
   const total = subtotal + delivery;
-  const scheduleOptions = useMemo(() => {
-    const option = (label: string, date: Date | null) => ({ label, value: date?.toISOString() ?? null });
-    const plusHour = new Date(Date.now() + 60 * 60_000);
-    const tomorrowNoon = new Date(); tomorrowNoon.setDate(tomorrowNoon.getDate() + 1); tomorrowNoon.setHours(12, 0, 0, 0);
-    const tomorrowEvening = new Date(tomorrowNoon); tomorrowEvening.setHours(18, 0, 0, 0);
-    return [option('Lo antes posible', null), option(`Hoy · ${plusHour.toLocaleTimeString('es-DO',{hour:'numeric',minute:'2-digit'})}`, plusHour), option('Mañana · 12:00 PM', tomorrowNoon), option('Mañana · 6:00 PM', tomorrowEvening)];
-  }, []);
   useEffect(() => {
     if (selectedAddress?.street) setAddressText(selectedAddress.street);
   }, [selectedAddress?.id]);
@@ -674,7 +694,7 @@ function Cart({
         deliveryType,
         addressId,
         address: addressText.trim(),
-        scheduledFor,
+        scheduledFor: null,
         paymentMethodId,
         lines: shop.cart,
       });
@@ -814,8 +834,6 @@ function Cart({
                 {selectedAddress && <View style={s.checkoutContext}><Ionicons name="navigate-circle" size={22} color={colors.green} /><View style={{ flex:1 }}><Text style={s.checkoutContextTitle}>{selectedAddress.detected_zone_name || 'Zona validada'}</Text><Text style={s.checkoutContextSub}>Atiende {branch.name} · Delivery {money(delivery)}</Text></View></View>}
               </>
             )}
-            <Text style={s.optionTitle}>¿Cuándo lo quieres?</Text>
-            <View style={s.checkoutOptions}>{scheduleOptions.map((option) => <Choice key={option.label} label={option.label} active={scheduledFor === option.value} onPress={() => setScheduledFor(option.value)} />)}</View>
             </>}
             {step === 3 && <>
             <Text style={s.optionTitle}>Método de pago</Text>
@@ -915,7 +933,7 @@ function OrderConfirmation({ visible, order, onHome, onTrack }: { visible: boole
   return <Modal visible={visible} animationType="slide" onRequestClose={onHome}><SafeAreaView style={s.confirmScreen}>
     <View style={s.confirmIcon}><Ionicons name="checkmark" size={48} color="white" /></View>
     <Text style={s.confirmKicker}>PEDIDO CONFIRMADO</Text><Text style={s.confirmTitle}>¡Ya estamos preparando tu pizza!</Text>
-    <Text style={s.confirmNumber}>Pedido #{order?.account_id}</Text>
+    <Text style={s.confirmNumber}>Orden {order?.order_code || `#${order?.account_id}`}</Text>
     <View style={s.confirmEta}><Ionicons name="time" size={24} color={colors.brown} /><View><Text style={s.confirmEtaLabel}>Tiempo estimado</Text><Text style={s.confirmEtaValue}>{eta}</Text></View></View>
     <Text style={s.confirmBranch}>{order?.branchName}</Text><Text style={s.confirmBody}>Puedes seguir cada etapa del pedido desde la sección Pedidos.</Text>
     <Pressable onPress={onTrack} style={s.confirmPrimary}><Text style={s.confirmPrimaryText}>Seguir mi pedido</Text></Pressable>
@@ -944,7 +962,7 @@ function RewardsPanel({ session, loyalty, program, onLogin, onChanged }: { sessi
 const s = StyleSheet.create({
   rewardsEmpty:{ alignItems:'center',paddingTop:48 },rewardsGift:{ width:78,height:78,borderRadius:26,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center' },rewardsCard:{ borderRadius:24,padding:22,marginTop:22,...shadow },rewardsLabel:{ fontSize:10,fontWeight:'900',letterSpacing:1.4,color:colors.yellow },rewardsBalance:{ fontSize:52,fontWeight:'900',color:'white',marginTop:3 },rewardsCaption:{ fontSize:12,color:'#E7D2CD' },rewardsProgress:{ height:8,borderRadius:4,backgroundColor:'rgba(255,255,255,.18)',marginTop:20,overflow:'hidden' },rewardsProgressFill:{ height:'100%',backgroundColor:colors.yellow,borderRadius:4 },rewardsNext:{ fontSize:11,fontWeight:'800',color:'white',marginTop:9 },rewardMovement:{ backgroundColor:'white',borderRadius:15,borderWidth:1,borderColor:colors.border,padding:13,flexDirection:'row',alignItems:'center',gap:10,marginBottom:9 },rewardMovementIcon:{ width:36,height:36,borderRadius:11,backgroundColor:colors.cream,alignItems:'center',justifyContent:'center' },rewardPoints:{ fontSize:15,fontWeight:'900' },
   confirmScreen:{ flex:1,backgroundColor:colors.cream,alignItems:'center',justifyContent:'center',padding:28 },confirmIcon:{ width:96,height:96,borderRadius:48,backgroundColor:colors.green,alignItems:'center',justifyContent:'center',marginBottom:24 },confirmKicker:{ fontSize:11,fontWeight:'900',letterSpacing:1.5,color:colors.green },confirmTitle:{ fontSize:29,lineHeight:34,fontWeight:'900',color:colors.text,textAlign:'center',marginTop:8 },confirmNumber:{ fontSize:15,fontWeight:'800',color:colors.muted,marginTop:10 },confirmEta:{ width:'100%',backgroundColor:'white',borderRadius:18,padding:16,flexDirection:'row',alignItems:'center',gap:12,marginTop:28,borderWidth:1,borderColor:colors.border },confirmEtaLabel:{ fontSize:11,color:colors.muted },confirmEtaValue:{ fontSize:18,fontWeight:'900',color:colors.brown,marginTop:2 },confirmBranch:{ fontSize:13,fontWeight:'900',color:colors.brown,marginTop:18 },confirmBody:{ fontSize:13,lineHeight:19,color:colors.muted,textAlign:'center',marginTop:7 },confirmPrimary:{ width:'100%',height:54,borderRadius:16,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center',marginTop:28 },confirmPrimaryText:{ fontSize:15,fontWeight:'900',color:colors.brown },confirmSecondary:{ padding:16 },confirmSecondaryText:{ fontSize:13,fontWeight:'800',color:colors.muted },
-  campaigns:{ gap:12,paddingRight:18,marginBottom:14 },campaignCard:{ width:330,height:210,borderRadius:24,overflow:'hidden',backgroundColor:colors.brown,...shadow },campaignImage:{ width:'100%',height:'100%' },campaignShade:{ position:'absolute',left:0,right:0,top:0,bottom:0,padding:18,justifyContent:'space-between' },campaignBadge:{alignSelf:'flex-start',backgroundColor:colors.red,borderRadius:10,paddingHorizontal:10,paddingVertical:7,flexDirection:'row',alignItems:'center',gap:5},campaignBadgeText:{fontSize:10,fontWeight:'900',letterSpacing:.5,color:'white'},campaignBottom:{alignItems:'flex-start'},campaignTitle:{ fontSize:24,lineHeight:27,fontWeight:'900',color:'white',maxWidth:275 },campaignDescription:{ fontSize:11,color:'#F3E6E2',marginTop:4 },campaignCta:{ alignSelf:'flex-start',marginTop:10,backgroundColor:colors.yellow,borderRadius:11,paddingHorizontal:12,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:6 },campaignCtaText:{ fontSize:12,fontWeight:'900',color:colors.brown },
+  carouselWrap:{marginBottom:14},campaigns:{ gap:12 },campaignCard:{ height:210,borderRadius:24,overflow:'hidden',backgroundColor:colors.brown,...shadow },campaignImage:{ width:'100%',height:'100%' },campaignShade:{ position:'absolute',left:0,right:0,top:0,bottom:0,padding:18,justifyContent:'space-between' },campaignBadge:{alignSelf:'flex-start',backgroundColor:colors.red,borderRadius:10,paddingHorizontal:10,paddingVertical:7,flexDirection:'row',alignItems:'center',gap:5},campaignBadgeText:{fontSize:10,fontWeight:'900',letterSpacing:.5,color:'white'},campaignBottom:{alignItems:'flex-start'},campaignTitle:{ fontSize:24,lineHeight:27,fontWeight:'900',color:'white',maxWidth:275 },campaignDescription:{ fontSize:11,color:'#F3E6E2',marginTop:4 },campaignCta:{ alignSelf:'flex-start',marginTop:10,backgroundColor:colors.yellow,borderRadius:11,paddingHorizontal:12,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:6 },campaignCtaText:{ fontSize:12,fontWeight:'900',color:colors.brown },carouselDots:{height:18,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6,marginTop:8},carouselDot:{width:7,height:7,borderRadius:4,backgroundColor:'#D7C9C2'},carouselDotActive:{width:22,backgroundColor:colors.brown},offerContext:{backgroundColor:colors.brown,borderRadius:18,padding:14,flexDirection:'row',alignItems:'center',gap:11,marginBottom:16},offerContextIcon:{width:40,height:40,borderRadius:13,backgroundColor:colors.red,alignItems:'center',justifyContent:'center'},offerContextKicker:{fontSize:8,fontWeight:'900',letterSpacing:1.1,color:colors.yellow},offerContextTitle:{fontSize:17,fontWeight:'900',color:'white',marginTop:2},offerContextSub:{fontSize:9,color:'#E7D2CD',marginTop:3},offerClose:{width:34,height:34,borderRadius:11,backgroundColor:'white',alignItems:'center',justifyContent:'center'},
   skeletonCard:{ width:'48%',height:218,borderRadius:19,backgroundColor:'white',overflow:'hidden' },skeletonImage:{ height:125,backgroundColor:'#EEE8E4' },skeletonLineWide:{ height:14,borderRadius:7,backgroundColor:'#EEE8E4',margin:12,marginBottom:7 },skeletonLine:{ height:10,width:'58%',borderRadius:5,backgroundColor:'#F2EEEB',marginHorizontal:12 },
   checkoutSteps:{ flexDirection:'row',justifyContent:'space-between',marginBottom:22,paddingHorizontal:2,backgroundColor:'white',borderRadius:18,paddingVertical:13,borderWidth:1,borderColor:'#E9DED7' },
   checkoutStep:{ alignItems:'center',flex:1,gap:5,position:'relative' },checkoutStepLine:{position:'absolute',height:2,backgroundColor:'#E4D8D2',right:'50%',left:'-50%',top:14},checkoutStepLineActive:{backgroundColor:colors.brown},checkoutStepDot:{ width:30,height:30,borderRadius:15,backgroundColor:'#EEE5E0',alignItems:'center',justifyContent:'center',zIndex:1 },checkoutStepDotActive:{ backgroundColor:colors.brown },checkoutStepNumber:{ fontSize:11,fontWeight:'900',color:colors.muted },checkoutStepNumberActive:{ color:'white' },checkoutStepLabel:{ fontSize:9,fontWeight:'700',color:colors.muted },checkoutStepLabelActive:{ color:colors.brown,fontWeight:'900' },
@@ -1224,11 +1242,13 @@ const s = StyleSheet.create({
     overflow: "hidden",
     ...shadow,
   },
+  featuredProductCard:{width:'100%'},
   productImage: {
     width: "100%",
     height: 125,
     backgroundColor: colors.yellowSoft,
   },
+  featuredProductImage:{height:210},
   heart: {
     position: "absolute",
     right: 9,

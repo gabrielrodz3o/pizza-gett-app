@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator,Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOrderDetail } from '@/features/customer/api';
 import { colors } from '@/shared/theme';
+import { isCancelledOrder,orderEta,orderProgress,orderStages } from '../presentation';
 
-type Props = { visible: boolean; orderId: number | null; onClose: () => void };
+type Props = { visible: boolean; orderId: number | null; onClose: () => void; onReorder?:()=>void };
 
 const money = (v: number) => `RD$${(v ?? 0).toLocaleString('es-DO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-export function OrderDetailModal({ visible, orderId, onClose }: Props) {
+export function OrderDetailModal({ visible, orderId, onClose,onReorder }: Props) {
   const insets = useSafeAreaInsets();
   const safeTop = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 47 : 0);
   const safeBottom = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 0);
@@ -32,6 +33,8 @@ export function OrderDetailModal({ visible, orderId, onClose }: Props) {
 
   const deliveryCost = Number(order?.cost_delivery || 0);
   const grandTotal = subtotal - discount + taxes + deliveryCost;
+  const stages=orderStages(Boolean(order?.is_delivery));
+  const progress=orderProgress(order);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -42,7 +45,7 @@ export function OrderDetailModal({ visible, orderId, onClose }: Props) {
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </Pressable>
           <View style={s.headerCenter}>
-            <Text style={s.headerTitle}>Pedido #{orderId}</Text>
+            <Text style={s.headerTitle}>Orden {order?.order_code || `#${orderId}`}</Text>
             {order?.location_name && (
               <Text style={s.headerSubtitle} numberOfLines={1}>{order.location_name_short || order.location_name}</Text>
             )}
@@ -78,6 +81,7 @@ export function OrderDetailModal({ visible, orderId, onClose }: Props) {
                 </View>
               </View>
               <Text style={s.orderDate}>Realizado el {order.created_at_format || new Date(order.created_at).toLocaleString()}</Text>
+              {!isCancelledOrder(order)&&<><Text style={s.eta}>{orderEta(order)}</Text><View style={s.timeline}>{stages.map((stage,index)=>{const done=index<progress,current=index===progress-1;return <View key={stage.key} style={s.stage}><View style={[s.stageIcon,done&&s.stageDone,current&&s.stageCurrent]}><Ionicons name={stage.icon as any} size={16} color={done?'white':colors.muted}/></View>{index<stages.length-1&&<View style={[s.stageLine,done&&index<progress-1&&s.stageLineDone]}/>}<Text style={[s.stageText,current&&s.stageTextCurrent]}>{stage.label}</Text></View>})}</View></>}
             </View>
 
             {/* Products List */}
@@ -89,6 +93,7 @@ export function OrderDetailModal({ visible, orderId, onClose }: Props) {
                 
                 return (
                   <View key={`${item.item_id}-${idx}`} style={[s.productRow, idx > 0 && s.productBorder]}>
+                    <View style={s.productImageWrap}>{item.item_image_url?<Image source={{uri:item.item_image_url}} style={s.productImage}/>:<Ionicons name="pizza-outline" size={28} color={colors.brown}/>}</View>
                     <View style={s.productInfo}>
                       <View style={s.titleRow}>
                         <Text style={s.productName}>
@@ -103,6 +108,8 @@ export function OrderDetailModal({ visible, orderId, onClose }: Props) {
                           <Text style={s.comboText}>Parte del Combo: {item.combo_name}</Text>
                         </View>
                       )}
+                      {item.promotion_name&&<View style={s.promoBadge}><Ionicons name="pricetag" size={11} color={colors.green}/><Text style={s.promoText}>{item.promotion_name}{Number(item.promo_discount_percentage)>0?` · ${Number(item.promo_discount_percentage)}% menos`:''}</Text></View>}
+                      {Number(item.discount_amount)>0&&<Text style={s.netPrice}>Total con descuento: {money((Number(item.original_price)-Number(item.discount_amount))*Number(item.quantity))}</Text>}
 
                       {/* Display sides / customization */}
                       {item.side_types && item.side_types.map((type: any) => {
@@ -229,8 +236,10 @@ export function OrderDetailModal({ visible, orderId, onClose }: Props) {
                 </View>
               </View>
             )}
+            <View style={{height:76}}/>
           </ScrollView>
         )}
+        {!isLoading&&order&&onReorder&&<View style={s.footer}><Pressable onPress={onReorder} style={s.reorderButton}><Ionicons name="repeat" size={18} color={colors.brown}/><Text style={s.reorderButtonText}>Volver a pedir</Text></Pressable></View>}
       </View>
     </Modal>
   );
@@ -256,17 +265,18 @@ const s = StyleSheet.create({
   statusLabel: { fontSize: 14, fontWeight: '800', color: colors.text, flex: 1 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.yellowSoft },
   statusText: { fontSize: 11, fontWeight: '900', color: colors.brown },
-  orderDate: { fontSize: 11, color: colors.muted, marginTop: 10 },
+  orderDate: { fontSize: 11, color: colors.muted, marginTop: 10 },eta:{fontSize:16,fontWeight:'900',color:colors.brown,marginTop:14},timeline:{flexDirection:'row',marginTop:16},stage:{flex:1,alignItems:'center',position:'relative'},stageIcon:{width:34,height:34,borderRadius:17,backgroundColor:'#EEE7E2',alignItems:'center',justifyContent:'center',zIndex:2},stageDone:{backgroundColor:colors.green},stageCurrent:{borderWidth:3,borderColor:'#BFE3CB'},stageLine:{position:'absolute',height:3,left:'50%',right:'-50%',top:16,backgroundColor:'#E6DDD8'},stageLineDone:{backgroundColor:colors.green},stageText:{fontSize:8,color:colors.muted,textAlign:'center',marginTop:6},stageTextCurrent:{fontWeight:'900',color:colors.brown},
   sectionTitle: { fontSize: 15, fontWeight: '900', color: colors.text, marginTop: 8, marginBottom: 10, paddingLeft: 4 },
   card: { backgroundColor: 'white', borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
-  productRow: { paddingVertical: 12 },
+  productRow: { paddingVertical: 12,flexDirection:'row',gap:12 },
   productBorder: { borderTopWidth: 1, borderTopColor: colors.border },
-  productInfo: { gap: 4 },
+  productImageWrap:{width:68,height:68,borderRadius:16,backgroundColor:colors.cream,alignItems:'center',justifyContent:'center',overflow:'hidden'},productImage:{width:'100%',height:'100%'},productInfo: { gap: 4,flex:1 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   productName: { fontSize: 14, fontWeight: '900', color: colors.text, flex: 1, marginRight: 16 },
   productPrice: { fontSize: 14, fontWeight: '900', color: colors.brown },
   comboBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   comboText: { fontSize: 11, fontWeight: '800', color: colors.orange },
+  promoBadge:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:4,backgroundColor:'#EDF9F1',borderRadius:8,paddingHorizontal:7,paddingVertical:5,marginTop:3},promoText:{fontSize:9,fontWeight:'900',color:colors.green},netPrice:{fontSize:10,fontWeight:'800',color:colors.green,marginTop:2},
   sideCategoryWrap: { marginTop: 6, paddingLeft: 10 },
   sideCategoryName: { fontSize: 12, fontWeight: '800', color: colors.muted },
   sideItem: { fontSize: 12, color: colors.text, marginLeft: 6, marginTop: 2 },
@@ -287,5 +297,5 @@ const s = StyleSheet.create({
   paymentMethodText: { fontSize: 11, color: colors.muted, fontWeight: '700' },
   driverCard: { backgroundColor: 'white', borderRadius: 20, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
   driverTitle: { fontSize: 11, fontWeight: '800', color: colors.muted },
-  driverName: { fontSize: 14, fontWeight: '900', color: colors.text, marginTop: 2 },
+  driverName: { fontSize: 14, fontWeight: '900', color: colors.text, marginTop: 2 },footer:{position:'absolute',left:0,right:0,bottom:0,padding:14,backgroundColor:'white',borderTopWidth:1,borderTopColor:colors.border},reorderButton:{height:52,borderRadius:16,backgroundColor:colors.yellow,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},reorderButtonText:{fontSize:14,fontWeight:'900',color:colors.brown},
 });
