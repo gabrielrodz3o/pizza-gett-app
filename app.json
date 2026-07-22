@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Pizza Getto",
+    "slug": "pizza-getto",
+    "scheme": "pizzagetto",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.pizzagetto.app", "usesAppleSignIn": true, "config": { "googleMapsApiKey": "AIzaSyDEu5aO7pMaGfHDtdLYiE440ScftgY2gJY" }, "infoPlist": { "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para colocar tu dirección dentro de nuestra zona de delivery." } },
+    "android": { "package": "com.pizzagetto.app", "config": { "googleMaps": { "apiKey": "AIzaSyDEu5aO7pMaGfHDtdLYiE440ScftgY2gJY" } }, "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"], "adaptiveIcon": { "backgroundColor": "#4A1F1F" } },
+    "plugins": ["expo-router", "expo-secure-store", "expo-apple-authentication"],
+    "experiments": { "typedRoutes": true },
+    "extra": {
+      "apiBaseUrl": "https://app.comandpos.com",
+      "branches": []
+    }
+  }
+}

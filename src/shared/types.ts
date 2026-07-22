@@ -1,0 +1,11 @@
+export type Branch = { id: number; catalogueId: number; name: string; address: string; phone?: string; eta: string; open: boolean; scheduleLabel?: string; delivery?: boolean; pickup?: boolean; pocketbaseUrl?: string; paymentMethods?: { id: number; name: string }[] };
+export type Campaign = { id: number; name: string; description: string; bannerUrl: string; altText: string; ctaLabel: string; locationId?: number; itemIds: number[] };
+export type SideOption = { id: number; name: string; item_id?: number | null; price: number; image?: string; max_quantity?: number; negative_sale?: boolean; selected?: boolean; sel_quantity?: number };
+export type SideCategory = { id: number; name: string; is_multiple: boolean; is_required: boolean; min_select?: number; max_select?: number | null; sides: SideOption[] };
+export type SelectedSide = { id: number; name: string; itemId?: number | null; price: number; quantity: number };
+export type ComboRecipeItem = { itemId: number; name: string; quantity: number };
+export type ComboOption = { id?: number; itemId: number; name: string; itemTypeId?: number; priceDelta: number; sequence?: number };
+export type ComboSlot = { id?: number; name: string; sequence: number; isRequired: boolean; quantity: number; virtual?: boolean; options: ComboOption[] };
+export type Promotion = { id?: number; name: string; type: 'DISCOUNT_PERCENTAGE' | 'DISCOUNT_FIXED' | 'BUY_X_GET_Y' | string; discountPercentage?: number; discountAmount?: number; requiredQuantity?: number; rewardQuantity?: number };
+export type Product = { id: number; name: string; description: string; price: number; originalPrice: number; orderPrice: number; category: string; image: string; popular?: boolean; promotion?: Promotion; productionCenterId?: number; taxTypeId?: number; taxRate: number; unitId?: number; itemTypeId?: number; menuId?: number; availableQuantity?: number; sidesCategories?: SideCategory[]; recipe?: ComboRecipeItem[] };
+export type CartLine = Product & { lineId: string; quantity: number; size: string; note?: string; selectedSides: SelectedSide[]; unitTotal: number; comboGroupId?: string; comboItemId?: number; comboName?: string; comboTaxTypeId?: number; comboUnitId?: number };

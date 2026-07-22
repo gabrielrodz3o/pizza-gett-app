@@ -1,0 +1,8 @@
+{
+  "cli": { "version": ">= 16.0.0" },
+  "build": {
+    "development": { "developmentClient": true, "distribution": "internal", "env": { "EXPO_PUBLIC_API_BASE_URL": "http://192.168.100.65:4080" } },
+    "test": { "distribution": "internal", "env": { "EXPO_PUBLIC_API_BASE_URL": "https://api-test.gcoderd.com" } },
+    "production": { "autoIncrement": true, "env": { "EXPO_PUBLIC_API_BASE_URL": "https://api.gcoderd.com" } }
+  }
+}
