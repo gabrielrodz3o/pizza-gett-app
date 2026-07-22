@@ -1,8 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -19,18 +18,20 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { getMenu, getMobileAppConfig, sendOrder } from "@/features/catalog/api";
+import { getMenu, sendOrder } from "@/features/catalog/api";
 import { ComboBuilder } from "@/features/catalog/components/ComboBuilder";
 import { ProductCustomizer } from "@/features/catalog/components/ProductCustomizer";
 import { useShop } from "@/features/cart/store";
 import { AuthDialog } from "@/features/auth/components/AuthDialog";
 import { useCustomerAuth } from "@/features/auth/store";
-import { DeliveryAddress, getCustomerHome, getOrderDetail, redeemLoyaltyReward } from "@/features/customer/api";
+import { DeliveryAddress, getOrderDetail, redeemLoyaltyReward } from "@/features/customer/api";
 import { AddressesModal } from "@/features/customer/components/AddressesModal";
 import { colors, shadow } from "@/shared/theme";
 import { Branch, Product } from "@/shared/types";
 import { OrdersTracking as OrdersTrackingFeature } from "@/features/orders/components/OrdersTracking";
 import { ProfileContent } from "@/features/customer/components/ProfileContent";
+import { usePendingOrderRecovery } from '@/features/orders/usePendingOrderRecovery';
+import { useMobileExperienceData } from '@/features/catalog/useMobileExperienceData';
 
 const money = (n: number) => `RD$${n.toLocaleString("es-DO")}`;
 const promotionLabel = (product: Product) => {
@@ -56,6 +57,7 @@ export default function App() {
   const shop = useShop();
   const [tab, setTab] = useState<(typeof tabs)[number]["id"]>("home");
   const [category, setCategory] = useState("Todos");
+  const [campaignItemIds, setCampaignItemIds] = useState<number[] | null>(null);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Product | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<Product | null>(null);
@@ -67,47 +69,33 @@ export default function App() {
   const [confirmedOrder, setConfirmedOrder] = useState<any>(null);
   const mainScrollRef = useRef<ScrollView>(null);
   const customerAuth = useCustomerAuth();
+  const recoverOrder=useCallback((order:any)=>{shop.clear();setCartOpen(false);setConfirmedOrder(order);void customerQueryRef.current?.();},[shop]);
+  const customerQueryRef=useRef<null|(()=>void)>(null);
+  usePendingOrderRecovery(recoverOrder);
   useEffect(() => {
     customerAuth.restore();
     AsyncStorage.getItem('pizza-getto-last-tab').then((value) => { if (tabs.some((item) => item.id === value)) setTab(value as (typeof tabs)[number]['id']); }).catch(() => undefined);
   }, []);
   const selectTab = (next: (typeof tabs)[number]['id']) => {
     setTab(next);
-    if (next !== 'menu') { setCategory('Todos'); setSearch(''); }
+    if (next !== 'menu') { setCategory('Todos'); setCampaignItemIds(null); setSearch(''); }
     requestAnimationFrame(() => mainScrollRef.current?.scrollTo({ y: 0, animated: false }));
     void AsyncStorage.setItem('pizza-getto-last-tab', next);
   };
-  const customerQuery = useQuery({
-    queryKey: ["customer-home", customerAuth.session?.profile.id],
-    queryFn: getCustomerHome,
-    enabled: !!customerAuth.session,
-    refetchInterval: tab === 'orders' ? 15_000 : 60_000,
-  });
-  const configQuery = useQuery({
-    queryKey: ["mobile-app", "pizza-getto"],
-    queryFn: () => getMobileAppConfig(),
-    refetchInterval: 60_000,
-  });
+  const {customerQuery,configQuery,menuQuery:query,branches:availableBranches,branch}=useMobileExperienceData(shop.branchId,tab);
+  customerQueryRef.current=()=>{void customerQuery.refetch();};
   const loyaltyProgram = configQuery.data?.loyalty ?? null;
   const visibleTabs = loyaltyProgram ? tabs : tabs.filter((item) => item.id !== 'rewards');
   useEffect(() => { if (!loyaltyProgram && tab === 'rewards' && !configQuery.isLoading) selectTab('home'); }, [loyaltyProgram,tab,configQuery.isLoading]);
-  const availableBranches = configQuery.data?.branches ?? [];
-  const branch = availableBranches.find((x) => x.id === shop.branchId);
   const campaigns = (configQuery.data?.campaigns ?? []).filter((campaign) => !campaign.locationId || campaign.locationId === branch?.id);
   const addresses: DeliveryAddress[] = customerQuery.data?.addresses ?? [];
   const selectedAddress = addresses.find((x) => x.id === shop.selectedAddressId);
-  const query = useQuery({
-    queryKey: ["menu", branch?.id],
-    queryFn: () => getMenu(branch!),
-    enabled: !!branch,
-    refetchInterval: 60_000,
-  });
   const products = query.data?.products ?? [];
   const menuAvailability = query.data?.availability;
   const categories = ["Todos", "Ofertas", "Favoritos", ...new Set(products.map((x) => x.category))];
   const filtered = products.filter(
     (x) =>
-      (category === "Todos" || (category === 'Ofertas' ? Boolean(x.promotion) : category === 'Favoritos' ? shop.favorites.includes(x.id) : x.category === category)) &&
+      (category === "Todos" || (category === 'Ofertas' ? (campaignItemIds ? campaignItemIds.includes(x.id) : Boolean(x.promotion)) : category === 'Favoritos' ? shop.favorites.includes(x.id) : x.category === category)) &&
       `${x.name} ${x.description}`.toLowerCase().includes(search.toLowerCase()),
   );
   const comboGroups = new Set(
@@ -225,11 +213,12 @@ export default function App() {
       >
         {tab === "home" && campaigns.length > 0 && (
           <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={s.campaigns}>
-            {campaigns.map((campaign) => <Pressable key={campaign.id} accessibilityRole="button" accessibilityLabel={`${campaign.name}. ${campaign.ctaLabel}`} onPress={() => { selectTab('menu'); setCategory('Ofertas'); }} style={s.campaignCard}>
+            {campaigns.map((campaign) => <Pressable key={campaign.id} accessibilityRole="button" accessibilityLabel={`${campaign.name}. ${campaign.ctaLabel}`} onPress={() => { selectTab('menu'); setCampaignItemIds(campaign.itemIds); setCategory('Ofertas'); }} style={s.campaignCard}>
               <Image source={{ uri: campaign.bannerUrl }} accessibilityLabel={campaign.altText} style={s.campaignImage} />
-              <LinearGradient colors={['transparent','rgba(30,8,8,.88)']} style={s.campaignShade}>
-                <Text style={s.campaignTitle} numberOfLines={2}>{campaign.name}</Text><Text style={s.campaignDescription} numberOfLines={1}>{campaign.description}</Text>
-                <View style={s.campaignCta}><Text style={s.campaignCtaText}>{campaign.ctaLabel}</Text><Ionicons name="arrow-forward" size={15} color={colors.brown} /></View>
+              <LinearGradient colors={['rgba(30,8,8,.08)','rgba(30,8,8,.92)']} style={s.campaignShade}>
+                <View style={s.campaignBadge}><Ionicons name="pricetag" size={12} color="white"/><Text style={s.campaignBadgeText}>{campaign.type === 'DISCOUNT_PERCENTAGE' ? `${campaign.discountPercentage}% DE DESCUENTO` : 'OFERTA ESPECIAL'}</Text></View>
+                <View style={s.campaignBottom}><Text style={s.campaignTitle} numberOfLines={2}>{campaign.name}</Text><Text style={s.campaignDescription} numberOfLines={1}>{campaign.description || `${campaign.itemIds.length} productos seleccionados`}</Text>
+                <View style={s.campaignCta}><Text style={s.campaignCtaText}>Ver productos</Text><Ionicons name="arrow-forward" size={15} color={colors.brown} /></View></View>
               </LinearGradient>
             </Pressable>)}
           </ScrollView>
@@ -245,7 +234,7 @@ export default function App() {
             </Pressable>
           </View>
         )}
-        {tab === "home" && (
+        {tab === "home" && campaigns.length === 0 && (
           <LinearGradient colors={[colors.brownDark, colors.brown]} style={s.hero}>
             <View style={{ flex: 1 }}><Text style={s.heroKicker}>HECHO PARA COMPARTIR</Text><Text style={s.heroTitle}>Tu pizza favorita, más cerca.</Text><Text style={s.heroPrice}>{branch.eta}</Text><Pressable onPress={() => selectTab("menu")} style={s.heroButton}><Text style={s.heroButtonText}>Ver el menú</Text></Pressable></View><Text style={s.pizzaEmoji}>🍕</Text>
           </LinearGradient>
@@ -277,7 +266,7 @@ export default function App() {
               {categories.map((x) => (
                 <Pressable
                   key={x}
-                  onPress={() => setCategory(x)}
+                  onPress={() => { setCampaignItemIds(null); setCategory(x); }}
                   style={[s.chip, category === x && s.chipActive]}
                 >
                   <Text
@@ -691,6 +680,10 @@ function Cart({
       });
       onSent(result);
     } catch (error: any) {
+      if(error?.code==='ORDER_CONFIRMATION_UNKNOWN'){
+        Alert.alert('Estamos verificando tu pedido','La conexión se interrumpió. No vuelvas a enviarlo: lo confirmaremos automáticamente cuando regrese internet.');
+        return;
+      }
       Alert.alert(
         "No se pudo enviar",
         error?.response?.data?.message ??
@@ -713,18 +706,18 @@ function Cart({
   return (
     <View style={[s.cartScreen, { paddingTop: safeTop, paddingBottom: safeBottom }]}>
       <View style={s.cartHeader}>
-        <Pressable onPress={onClose}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        <Pressable onPress={onClose} style={s.cartBack}>
+          <Ionicons name="arrow-back" size={22} color={colors.brown} />
         </Pressable>
-        <Text style={s.cartTitle}>Tu carrito</Text>
-        <View style={{ width: 24 }} />
+        <View style={{flex:1}}><Text style={s.cartKicker}>TU ORDEN</Text><Text style={s.cartTitle}>{step===1?'Revisa tu carrito':step===2?'Entrega y horario':'Confirma tu pedido'}</Text></View>
+        <View style={s.cartItemCount}><Text style={s.cartItemCountText}>{shop.cart.reduce((sum,line)=>sum+line.quantity,0)}</Text></View>
       </View>
       <ScrollView contentContainerStyle={s.cartContent}>
         {shop.cart.length === 0 ? (
           <Empty icon="bag-outline" title="Tu carrito está vacío" />
         ) : (
           <>
-            <View style={s.checkoutSteps}>{['Carrito','Entrega','Confirmar'].map((label, index) => { const number = index + 1; return <View key={label} style={s.checkoutStep}><View style={[s.checkoutStepDot, number <= step && s.checkoutStepDotActive]}><Text style={[s.checkoutStepNumber, number <= step && s.checkoutStepNumberActive]}>{number < step ? '✓' : number}</Text></View><Text style={[s.checkoutStepLabel, number === step && s.checkoutStepLabelActive]}>{label}</Text></View>; })}</View>
+            <View style={s.checkoutSteps}>{['Carrito','Entrega','Confirmar'].map((label, index) => { const number = index + 1; return <View key={label} style={s.checkoutStep}><View style={[s.checkoutStepLine,index===0&&{opacity:0},number<=step&&s.checkoutStepLineActive]}/><View style={[s.checkoutStepDot, number <= step && s.checkoutStepDotActive]}><Text style={[s.checkoutStepNumber, number <= step && s.checkoutStepNumberActive]}>{number < step ? '✓' : number}</Text></View><Text style={[s.checkoutStepLabel, number === step && s.checkoutStepLabelActive]}>{label}</Text></View>; })}</View>
             {step === 1 && <>
             {visible.map((x) => {
               const components = x.comboGroupId
@@ -847,7 +840,7 @@ function Cart({
           {step > 1 && <Pressable accessibilityRole="button" onPress={() => setStep((step - 1) as 1 | 2)} style={s.backStep}><Ionicons name="arrow-back" size={20} color={colors.brown} /></Pressable>}
           <Pressable
             disabled={sending}
-            style={[s.primary, sending && { opacity: 0.6 }]}
+            style={[s.primary, s.cartPrimary, sending && { opacity: 0.6 }]}
             onPress={() => step < 3 ? setStep((step + 1) as 2 | 3) : submit()}
           >
             {sending ? (
@@ -951,10 +944,10 @@ function RewardsPanel({ session, loyalty, program, onLogin, onChanged }: { sessi
 const s = StyleSheet.create({
   rewardsEmpty:{ alignItems:'center',paddingTop:48 },rewardsGift:{ width:78,height:78,borderRadius:26,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center' },rewardsCard:{ borderRadius:24,padding:22,marginTop:22,...shadow },rewardsLabel:{ fontSize:10,fontWeight:'900',letterSpacing:1.4,color:colors.yellow },rewardsBalance:{ fontSize:52,fontWeight:'900',color:'white',marginTop:3 },rewardsCaption:{ fontSize:12,color:'#E7D2CD' },rewardsProgress:{ height:8,borderRadius:4,backgroundColor:'rgba(255,255,255,.18)',marginTop:20,overflow:'hidden' },rewardsProgressFill:{ height:'100%',backgroundColor:colors.yellow,borderRadius:4 },rewardsNext:{ fontSize:11,fontWeight:'800',color:'white',marginTop:9 },rewardMovement:{ backgroundColor:'white',borderRadius:15,borderWidth:1,borderColor:colors.border,padding:13,flexDirection:'row',alignItems:'center',gap:10,marginBottom:9 },rewardMovementIcon:{ width:36,height:36,borderRadius:11,backgroundColor:colors.cream,alignItems:'center',justifyContent:'center' },rewardPoints:{ fontSize:15,fontWeight:'900' },
   confirmScreen:{ flex:1,backgroundColor:colors.cream,alignItems:'center',justifyContent:'center',padding:28 },confirmIcon:{ width:96,height:96,borderRadius:48,backgroundColor:colors.green,alignItems:'center',justifyContent:'center',marginBottom:24 },confirmKicker:{ fontSize:11,fontWeight:'900',letterSpacing:1.5,color:colors.green },confirmTitle:{ fontSize:29,lineHeight:34,fontWeight:'900',color:colors.text,textAlign:'center',marginTop:8 },confirmNumber:{ fontSize:15,fontWeight:'800',color:colors.muted,marginTop:10 },confirmEta:{ width:'100%',backgroundColor:'white',borderRadius:18,padding:16,flexDirection:'row',alignItems:'center',gap:12,marginTop:28,borderWidth:1,borderColor:colors.border },confirmEtaLabel:{ fontSize:11,color:colors.muted },confirmEtaValue:{ fontSize:18,fontWeight:'900',color:colors.brown,marginTop:2 },confirmBranch:{ fontSize:13,fontWeight:'900',color:colors.brown,marginTop:18 },confirmBody:{ fontSize:13,lineHeight:19,color:colors.muted,textAlign:'center',marginTop:7 },confirmPrimary:{ width:'100%',height:54,borderRadius:16,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center',marginTop:28 },confirmPrimaryText:{ fontSize:15,fontWeight:'900',color:colors.brown },confirmSecondary:{ padding:16 },confirmSecondaryText:{ fontSize:13,fontWeight:'800',color:colors.muted },
-  campaigns:{ gap:12,paddingRight:18 },campaignCard:{ width:330,height:188,borderRadius:24,overflow:'hidden',backgroundColor:colors.brown,...shadow },campaignImage:{ width:'100%',height:'100%' },campaignShade:{ position:'absolute',left:0,right:0,top:0,bottom:0,padding:18,justifyContent:'flex-end' },campaignTitle:{ fontSize:22,lineHeight:25,fontWeight:'900',color:'white' },campaignDescription:{ fontSize:11,color:'#F3E6E2',marginTop:4 },campaignCta:{ alignSelf:'flex-start',marginTop:10,backgroundColor:colors.yellow,borderRadius:11,paddingHorizontal:12,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:6 },campaignCtaText:{ fontSize:12,fontWeight:'900',color:colors.brown },
+  campaigns:{ gap:12,paddingRight:18,marginBottom:14 },campaignCard:{ width:330,height:210,borderRadius:24,overflow:'hidden',backgroundColor:colors.brown,...shadow },campaignImage:{ width:'100%',height:'100%' },campaignShade:{ position:'absolute',left:0,right:0,top:0,bottom:0,padding:18,justifyContent:'space-between' },campaignBadge:{alignSelf:'flex-start',backgroundColor:colors.red,borderRadius:10,paddingHorizontal:10,paddingVertical:7,flexDirection:'row',alignItems:'center',gap:5},campaignBadgeText:{fontSize:10,fontWeight:'900',letterSpacing:.5,color:'white'},campaignBottom:{alignItems:'flex-start'},campaignTitle:{ fontSize:24,lineHeight:27,fontWeight:'900',color:'white',maxWidth:275 },campaignDescription:{ fontSize:11,color:'#F3E6E2',marginTop:4 },campaignCta:{ alignSelf:'flex-start',marginTop:10,backgroundColor:colors.yellow,borderRadius:11,paddingHorizontal:12,paddingVertical:8,flexDirection:'row',alignItems:'center',gap:6 },campaignCtaText:{ fontSize:12,fontWeight:'900',color:colors.brown },
   skeletonCard:{ width:'48%',height:218,borderRadius:19,backgroundColor:'white',overflow:'hidden' },skeletonImage:{ height:125,backgroundColor:'#EEE8E4' },skeletonLineWide:{ height:14,borderRadius:7,backgroundColor:'#EEE8E4',margin:12,marginBottom:7 },skeletonLine:{ height:10,width:'58%',borderRadius:5,backgroundColor:'#F2EEEB',marginHorizontal:12 },
-  checkoutSteps:{ flexDirection:'row',justifyContent:'space-between',marginBottom:20,paddingHorizontal:4 },
-  checkoutStep:{ alignItems:'center',flex:1,gap:5 },checkoutStepDot:{ width:30,height:30,borderRadius:15,backgroundColor:colors.border,alignItems:'center',justifyContent:'center' },checkoutStepDotActive:{ backgroundColor:colors.brown },checkoutStepNumber:{ fontSize:12,fontWeight:'900',color:colors.muted },checkoutStepNumberActive:{ color:'white' },checkoutStepLabel:{ fontSize:10,fontWeight:'700',color:colors.muted },checkoutStepLabelActive:{ color:colors.brown,fontWeight:'900' },
+  checkoutSteps:{ flexDirection:'row',justifyContent:'space-between',marginBottom:22,paddingHorizontal:2,backgroundColor:'white',borderRadius:18,paddingVertical:13,borderWidth:1,borderColor:'#E9DED7' },
+  checkoutStep:{ alignItems:'center',flex:1,gap:5,position:'relative' },checkoutStepLine:{position:'absolute',height:2,backgroundColor:'#E4D8D2',right:'50%',left:'-50%',top:14},checkoutStepLineActive:{backgroundColor:colors.brown},checkoutStepDot:{ width:30,height:30,borderRadius:15,backgroundColor:'#EEE5E0',alignItems:'center',justifyContent:'center',zIndex:1 },checkoutStepDotActive:{ backgroundColor:colors.brown },checkoutStepNumber:{ fontSize:11,fontWeight:'900',color:colors.muted },checkoutStepNumberActive:{ color:'white' },checkoutStepLabel:{ fontSize:9,fontWeight:'700',color:colors.muted },checkoutStepLabelActive:{ color:colors.brown,fontWeight:'900' },
   checkoutHint:{ fontSize:11,lineHeight:16,color:colors.muted,marginTop:10 },reviewCard:{ flexDirection:'row',gap:10,alignItems:'center',padding:13,borderRadius:14,backgroundColor:'#EDF9F1',borderWidth:1,borderColor:'#C9EBD5',marginTop:12 },backStep:{ width:50,height:52,borderRadius:15,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center' },
   availabilityBanner: { flexDirection:'row', alignItems:'center', gap:9, borderRadius:15, padding:12, marginBottom:2, borderWidth:1 },
   availabilityOpen: { backgroundColor:'#EDF9F1', borderColor:'#C9EBD5' },
@@ -1439,35 +1432,35 @@ const s = StyleSheet.create({
     marginTop: 16,
   },
   primaryText: { fontSize: 15, fontWeight: "900", color: colors.brown },
-  cartScreen: { flex: 1, backgroundColor: colors.cream },
+  cartScreen: { flex: 1, backgroundColor: '#F8F3EE' },
   cartHeader: {
-    height: 60,
-    paddingHorizontal: 18,
+    minHeight: 76,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "white",
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    backgroundColor: colors.brown,
+    gap:12,
   },
-  cartTitle: { fontSize: 18, fontWeight: "900", color: colors.text },
-  cartContent: { padding: 18 },
+  cartBack:{width:43,height:43,borderRadius:14,backgroundColor:'white',alignItems:'center',justifyContent:'center'},cartKicker:{fontSize:8,fontWeight:'900',letterSpacing:1.2,color:colors.yellow},cartTitle: { fontSize: 19, fontWeight: "900", color: 'white',marginTop:2 },cartItemCount:{minWidth:36,height:36,borderRadius:12,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center',paddingHorizontal:8},cartItemCountText:{fontSize:13,fontWeight:'900',color:colors.brown},
+  cartContent: { padding: 16,paddingBottom:125 },
   cartLine: {
     backgroundColor: "white",
-    borderRadius: 18,
-    padding: 12,
+    borderRadius: 20,
+    padding: 13,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    marginBottom: 10,
+    marginBottom: 11,
+    borderWidth:1,
+    borderColor:'#E9DED7',
   },
-  cartImage: { width: 72, height: 72, borderRadius: 14 },
-  cartName: { fontSize: 14, fontWeight: "900", color: colors.text },
-  cartMeta: { fontSize: 12, color: colors.muted, marginVertical: 5 },
+  cartImage: { width: 76, height: 76, borderRadius: 16 },
+  cartName: { fontSize: 14, lineHeight:18,fontWeight: "900", color: colors.text },
+  cartMeta: { fontSize: 10,lineHeight:14, color: colors.muted, marginVertical: 5 },
   stepper: {
     height: 36,
     borderRadius: 12,
-    backgroundColor: colors.cream,
+    backgroundColor: colors.yellowSoft,
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
@@ -1492,11 +1485,16 @@ const s = StyleSheet.create({
   totalText: { fontSize: 18, fontWeight: "900", color: colors.text },
   divider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
   cartFooter: {
-    padding: 18,
+    paddingHorizontal:14,
+    paddingVertical:12,
     backgroundColor: "white",
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#E9DED7',
+    flexDirection:'row',
+    alignItems:'center',
+    gap:10,
   },
+  cartPrimary:{flex:1,marginTop:0},
   empty: { alignItems: "center", paddingVertical: 65, paddingHorizontal: 25 },
   emptyIcon: {
     width: 72,

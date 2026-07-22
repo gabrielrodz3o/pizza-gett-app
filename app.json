@@ -12,7 +12,7 @@
     "plugins": ["expo-router", "expo-secure-store", "expo-apple-authentication"],
     "experiments": { "typedRoutes": true },
     "extra": {
-      "apiBaseUrl": "https://app.comandpos.com",
+      "apiBaseUrl": "https://services-test.comandpos.com",
       "branches": []
     }
   }

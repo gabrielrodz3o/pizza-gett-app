@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { Branch, Campaign, CartLine, ComboSlot, Product, SideCategory } from '@/shared/types';
+import { appConfig } from '@/shared/config';
+import { logger } from '@/shared/logger';
+import { clearPendingOrder,savePendingOrder,submitPendingOrder } from '@/features/orders/pendingOrder';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-console.log('[API] EXPO_PUBLIC_API_BASE_URL =', BASE_URL ?? '⚠️  UNDEFINED');
+const BASE_URL = appConfig.apiBaseUrl;
 
 const api = axios.create({ baseURL: BASE_URL, timeout: 15_000 });
 
@@ -21,16 +23,15 @@ api.interceptors.request.use((config) => {
   const token = process.env.EXPO_PUBLIC_API_TOKEN;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   const url = `${config.baseURL ?? ''}${config.url ?? ''}`;
-  console.log(`[API] ▶ ${config.method?.toUpperCase()} ${url}`, config.params ?? '');
+  logger.breadcrumb(`${config.method?.toUpperCase()} ${config.url}`);
   return config;
 }, (error) => {
-  console.error('[API] ✖ Request setup error:', error?.message);
+  logger.error(error,{area:'api-request'});
   return Promise.reject(error);
 });
 
 // ── Response logger ─────────────────────────────────────────────────────────
 api.interceptors.response.use((response) => {
-  console.log(`[API] ✔ ${response.status} ${response.config.url}`);
   return response;
 }, (error) => {
   const status  = error?.response?.status;
@@ -38,11 +39,11 @@ api.interceptors.response.use((response) => {
   const code    = error?.response?.data?.code;
   const message = error?.response?.data?.message ?? error?.message;
   if (error?.code === 'ECONNABORTED') {
-    console.error(`[API] ✖ TIMEOUT – ${url}`);
+    logger.error(error,{area:'api-timeout',url});
   } else if (!error?.response) {
-    console.error(`[API] ✖ NETWORK ERROR (no response) – ${url} –`, error?.message);
+    logger.error(error,{area:'api-network',url});
   } else {
-    console.error(`[API] ✖ HTTP ${status} – ${url} – code: ${code} – msg: ${message}`);
+    if(status>=500)logger.error(error,{area:'api-server',url,status,code,message});
   }
   return Promise.reject(error);
 });
@@ -184,6 +185,8 @@ export async function getMobileAppConfig(slug = 'pizza-getto'): Promise<{ branch
       bannerUrl: String(campaign.banner_url ?? ''), altText: String(campaign.banner_alt_text ?? campaign.name ?? 'Promoción'),
       ctaLabel: String(campaign.mobile_cta_label ?? 'Ver oferta'), locationId: campaign.location_id == null ? undefined : Number(campaign.location_id),
       itemIds: (Array.isArray(campaign.item_ids) ? campaign.item_ids : []).map(Number),
+      type: String(campaign.promotion_type ?? ''), discountPercentage: campaign.discount_percentage == null ? undefined : Number(campaign.discount_percentage),
+      discountAmount: campaign.discount_amount == null ? undefined : Number(campaign.discount_amount), endDate: campaign.end_date || undefined,
     })),
     branches: (payload.locations ?? []).map((location: any) => ({
       id: Number(location.id),
@@ -211,7 +214,13 @@ export async function sendOrder(branch: Branch, checkout: Checkout) {
     payment_method_id: checkout.paymentMethodId,
     order_details: checkout.lines.map((x) => ({ item_id: x.id, quantity: x.quantity, order_price: x.orderPrice, original_price: x.orderPrice, item_note: x.note ?? '', production_center_id: x.productionCenterId, tax_type_id: x.taxTypeId ?? 2, combo_group_id: x.comboGroupId ?? null, combo_item_id: x.comboItemId ?? null, combo_name: x.comboName ?? null, combo_tax_type_id: x.comboTaxTypeId ?? null, combo_unit_id: x.comboUnitId ?? null, sides: x.selectedSides.flatMap((side) => Array.from({ length: side.quantity }, () => ({ item_id: x.id, side_id: side.id }))) })),
   };
-  const token = (await import('@/features/auth/store')).useCustomerAuth.getState().session?.accessToken;
-  const { data } = await api.post('/v1/mobile/apps/pizza-getto/orders', payload, { headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': `${Date.now()}-${Math.random().toString(36).slice(2)}` } });
-  return data;
+  const idempotencyKey=`${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const pending={idempotencyKey,payload,branchName:branch.name,mode:checkout.deliveryType,createdAt:new Date().toISOString()};
+  await savePendingOrder(pending);
+  try{const response=await submitPendingOrder(pending);await clearPendingOrder();return response.data;}catch(error:any){
+    if(error?.response?.status===401){try{const response=await submitPendingOrder(pending,true);await clearPendingOrder();return response.data;}catch(retryError){throw retryError;}}
+    if(error?.response&&error.response.status<500)await clearPendingOrder();
+    else error.code='ORDER_CONFIRMATION_UNKNOWN';
+    throw error;
+  }
 }

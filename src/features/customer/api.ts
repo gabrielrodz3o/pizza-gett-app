@@ -1,8 +1,23 @@
 import axios from 'axios';
-import { CustomerSession, useCustomerAuth } from '@/features/auth/store';
+import { CustomerSession, getValidCustomerAccessToken } from '@/features/auth/store';
+import { appConfig } from '@/shared/config';
 
-const customerApi = axios.create({ baseURL: process.env.EXPO_PUBLIC_API_BASE_URL, timeout: 15_000 });
-customerApi.interceptors.request.use((config) => { const token = useCustomerAuth.getState().session?.accessToken; if (token) config.headers.Authorization = `Bearer ${token}`; return config; });
+const customerApi = axios.create({ baseURL: appConfig.apiBaseUrl, timeout: 15_000 });
+customerApi.interceptors.request.use(async(config) => {
+  const isAuthCall=String(config.url??'').includes('/auth/');
+  if(!isAuthCall){const token=await getValidCustomerAccessToken();if(token)config.headers.Authorization=`Bearer ${token}`;}
+  return config;
+});
+customerApi.interceptors.response.use(response=>response,async(error)=>{
+  const original=error?.config as any;
+  const isAuthCall=String(original?.url??'').includes('/auth/');
+  if(error?.response?.status===401&&original&&!original._customerRetried&&!isAuthCall){
+    original._customerRetried=true;
+    const token=await getValidCustomerAccessToken(true);
+    if(token){original.headers={...(original.headers??{}),Authorization:`Bearer ${token}`};return customerApi.request(original);}
+  }
+  return Promise.reject(error);
+});
 const root = '/v1/mobile/apps/pizza-getto';
 const formatSchedule = (start?: string, end?: string) => {
   const time = (value?: string) => { if (!value) return ''; const [h, m] = value.split(':').map(Number); return `${h % 12 || 12}:${String(m || 0).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`; };

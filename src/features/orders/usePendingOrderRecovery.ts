@@ -1,0 +1,7 @@
+import { useEffect,useRef } from 'react';
+import { AppState } from 'react-native';
+import NetInfo from '@react-native-community/netinfo';
+import { clearPendingOrder,getPendingOrder,queryPendingOrder,submitPendingOrder } from './pendingOrder';
+import { logger } from '@/shared/logger';
+
+export function usePendingOrderRecovery(onRecovered:(order:any)=>void){const running=useRef(false);useEffect(()=>{const recover=async()=>{if(running.current)return;const network=await NetInfo.fetch();if(network.isConnected===false||network.isInternetReachable===false)return;const pending=await getPendingOrder();if(!pending)return;running.current=true;try{let state:any;try{state=await queryPendingOrder(pending);}catch(error:any){if(error?.response?.status===404){const created=await submitPendingOrder(pending);state={status:'completed',response:created.data};}else throw error;}if(state?.status==='completed'&&state.response){await clearPendingOrder();onRecovered({...state.response?.data,branchName:pending.branchName,mode:pending.mode});}else if(state?.status==='failed'){await clearPendingOrder();}}catch(error){logger.error(error,{area:'pending-order-recovery'});}finally{running.current=false;}};void recover();const app=AppState.addEventListener('change',state=>{if(state==='active')void recover();});const net=NetInfo.addEventListener(state=>{if(state.isConnected&&state.isInternetReachable!==false)void recover();});const timer=setInterval(recover,15_000);return()=>{app.remove();net();clearInterval(timer);};},[onRecovered]);}

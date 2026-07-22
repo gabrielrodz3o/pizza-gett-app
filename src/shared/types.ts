@@ -1,5 +1,5 @@
 export type Branch = { id: number; catalogueId: number; name: string; address: string; phone?: string; eta: string; open: boolean; scheduleLabel?: string; delivery?: boolean; pickup?: boolean; pocketbaseUrl?: string; paymentMethods?: { id: number; name: string }[] };
-export type Campaign = { id: number; name: string; description: string; bannerUrl: string; altText: string; ctaLabel: string; locationId?: number; itemIds: number[] };
+export type Campaign = { id: number; name: string; description: string; bannerUrl: string; altText: string; ctaLabel: string; locationId?: number; itemIds: number[]; type?: string; discountPercentage?: number; discountAmount?: number; endDate?: string };
 export type SideOption = { id: number; name: string; item_id?: number | null; price: number; image?: string; max_quantity?: number; negative_sale?: boolean; selected?: boolean; sel_quantity?: number };
 export type SideCategory = { id: number; name: string; is_multiple: boolean; is_required: boolean; min_select?: number; max_select?: number | null; sides: SideOption[] };
 export type SelectedSide = { id: number; name: string; itemId?: number | null; price: number; quantity: number };
