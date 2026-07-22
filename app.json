@@ -7,9 +7,10 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "splash": { "backgroundColor": "#3F1516", "image": "./assets/brand/pizza-getto-logo.png", "resizeMode": "contain" },
     "ios": { "supportsTablet": true, "bundleIdentifier": "com.pizzagetto.app", "usesAppleSignIn": true, "config": { "googleMapsApiKey": "AIzaSyDEu5aO7pMaGfHDtdLYiE440ScftgY2gJY" }, "infoPlist": { "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para colocar tu dirección dentro de nuestra zona de delivery." } },
     "android": { "package": "com.pizzagetto.app", "config": { "googleMaps": { "apiKey": "AIzaSyDEu5aO7pMaGfHDtdLYiE440ScftgY2gJY" } }, "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"], "adaptiveIcon": { "backgroundColor": "#4A1F1F" } },
-    "plugins": ["expo-router", "expo-secure-store", "expo-apple-authentication"],
+    "plugins": ["expo-router", "expo-secure-store", "expo-apple-authentication", ["expo-splash-screen", { "backgroundColor": "#3F1516", "image": "./assets/brand/pizza-getto-logo.png", "imageWidth": 220 }]],
     "experiments": { "typedRoutes": true },
     "extra": {
       "apiBaseUrl": "https://services-test.comandpos.com",
