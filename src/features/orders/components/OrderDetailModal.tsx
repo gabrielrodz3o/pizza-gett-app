@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator,Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getOrderDetail } from '@/features/customer/api';
-import { colors } from '@/shared/theme';
+import { haptics } from '@/shared/haptics';
+import { colors, font } from '@/shared/theme';
 import { isCancelledOrder,orderEta,orderProgress,orderStages } from '../presentation';
 
 type Props = { visible: boolean; orderId: number | null; onClose: () => void; onReorder?:()=>void };
@@ -93,7 +95,7 @@ export function OrderDetailModal({ visible, orderId, onClose,onReorder }: Props)
                 
                 return (
                   <View key={`${item.item_id}-${idx}`} style={[s.productRow, idx > 0 && s.productBorder]}>
-                    <View style={s.productImageWrap}>{item.item_image_url?<Image source={{uri:item.item_image_url}} style={s.productImage}/>:<Ionicons name="pizza-outline" size={28} color={colors.brown}/>}</View>
+                    <View style={s.productImageWrap}>{item.item_image_url?<ExpoImage source={{uri:item.item_image_url}} transition={200} style={s.productImage}/>:<Ionicons name="pizza-outline" size={28} color={colors.brown}/>}</View>
                     <View style={s.productInfo}>
                       <View style={s.titleRow}>
                         <Text style={s.productName}>
@@ -239,7 +241,7 @@ export function OrderDetailModal({ visible, orderId, onClose,onReorder }: Props)
             <View style={{height:76}}/>
           </ScrollView>
         )}
-        {!isLoading&&order&&onReorder&&<View style={s.footer}><Pressable onPress={onReorder} style={s.reorderButton}><Ionicons name="repeat" size={18} color={colors.brown}/><Text style={s.reorderButtonText}>Volver a pedir</Text></Pressable></View>}
+        {!isLoading&&order&&onReorder&&<View style={s.footer}><Pressable accessibilityRole="button" accessibilityLabel="Volver a pedir esta orden" onPress={() => { haptics.press(); onReorder(); }} style={s.reorderButton}><Ionicons name="repeat" size={18} color={colors.brown}/><Text style={s.reorderButtonText}>Volver a pedir</Text></Pressable></View>}
       </View>
     </Modal>
   );
@@ -250,52 +252,52 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: 'white' },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flex: 1, alignItems: 'center' },
-  headerTitle: { fontSize: 17, fontWeight: '900', color: colors.text },
+  headerTitle: { fontSize: 17, fontFamily: font.black, color: colors.text },
   headerSubtitle: { fontSize: 12, color: colors.muted, marginTop: 1 },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loaderText: { fontSize: 13, color: colors.muted },
   errorState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
-  errorTitle: { fontSize: 18, fontWeight: '900', color: colors.text },
+  errorTitle: { fontSize: 18, fontFamily: font.black, color: colors.text },
   errorBody: { fontSize: 13, color: colors.muted, textAlign: 'center', lineHeight: 19 },
   errorBtn: { backgroundColor: colors.yellow, borderRadius: 14, paddingHorizontal: 20, paddingVertical: 12, marginTop: 8 },
-  errorBtnText: { fontSize: 14, fontWeight: '900', color: colors.brown },
+  errorBtnText: { fontSize: 14, fontFamily: font.black, color: colors.brown },
   scrollContent: { padding: 16, paddingBottom: 40 },
   statusCard: { backgroundColor: 'white', borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   statusHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusLabel: { fontSize: 14, fontWeight: '800', color: colors.text, flex: 1 },
+  statusLabel: { fontSize: 14, fontFamily: font.extraBold, color: colors.text, flex: 1 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: colors.yellowSoft },
-  statusText: { fontSize: 11, fontWeight: '900', color: colors.brown },
-  orderDate: { fontSize: 11, color: colors.muted, marginTop: 10 },eta:{fontSize:16,fontWeight:'900',color:colors.brown,marginTop:14},timeline:{flexDirection:'row',marginTop:16},stage:{flex:1,alignItems:'center',position:'relative'},stageIcon:{width:34,height:34,borderRadius:17,backgroundColor:'#EEE7E2',alignItems:'center',justifyContent:'center',zIndex:2},stageDone:{backgroundColor:colors.green},stageCurrent:{borderWidth:3,borderColor:'#BFE3CB'},stageLine:{position:'absolute',height:3,left:'50%',right:'-50%',top:16,backgroundColor:'#E6DDD8'},stageLineDone:{backgroundColor:colors.green},stageText:{fontSize:8,color:colors.muted,textAlign:'center',marginTop:6},stageTextCurrent:{fontWeight:'900',color:colors.brown},
-  sectionTitle: { fontSize: 15, fontWeight: '900', color: colors.text, marginTop: 8, marginBottom: 10, paddingLeft: 4 },
+  statusText: { fontSize: 11, fontFamily: font.black, color: colors.brown },
+  orderDate: { fontSize: 11, color: colors.muted, marginTop: 10 },eta:{fontSize:16,fontFamily: font.black,color:colors.brown,marginTop:14},timeline:{flexDirection:'row',marginTop:16},stage:{flex:1,alignItems:'center',position:'relative'},stageIcon:{width:34,height:34,borderRadius:17,backgroundColor:'#EEE7E2',alignItems:'center',justifyContent:'center',zIndex:2},stageDone:{backgroundColor:colors.green},stageCurrent:{borderWidth:3,borderColor:'#BFE3CB'},stageLine:{position:'absolute',height:3,left:'50%',right:'-50%',top:16,backgroundColor:'#E6DDD8'},stageLineDone:{backgroundColor:colors.green},stageText:{fontSize: 10,color:colors.muted,textAlign:'center',marginTop:6},stageTextCurrent:{fontFamily: font.black,color:colors.brown},
+  sectionTitle: { fontSize: 15, fontFamily: font.black, color: colors.text, marginTop: 8, marginBottom: 10, paddingLeft: 4 },
   card: { backgroundColor: 'white', borderRadius: 20, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   productRow: { paddingVertical: 12,flexDirection:'row',gap:12 },
   productBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   productImageWrap:{width:68,height:68,borderRadius:16,backgroundColor:colors.cream,alignItems:'center',justifyContent:'center',overflow:'hidden'},productImage:{width:'100%',height:'100%'},productInfo: { gap: 4,flex:1 },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  productName: { fontSize: 14, fontWeight: '900', color: colors.text, flex: 1, marginRight: 16 },
-  productPrice: { fontSize: 14, fontWeight: '900', color: colors.brown },
+  productName: { fontSize: 14, fontFamily: font.black, color: colors.text, flex: 1, marginRight: 16 },
+  productPrice: { fontSize: 14, fontFamily: font.black, color: colors.brown },
   comboBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  comboText: { fontSize: 11, fontWeight: '800', color: colors.orange },
-  promoBadge:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:4,backgroundColor:'#EDF9F1',borderRadius:8,paddingHorizontal:7,paddingVertical:5,marginTop:3},promoText:{fontSize:9,fontWeight:'900',color:colors.green},netPrice:{fontSize:10,fontWeight:'800',color:colors.green,marginTop:2},
+  comboText: { fontSize: 11, fontFamily: font.extraBold, color: colors.orange },
+  promoBadge:{alignSelf:'flex-start',flexDirection:'row',alignItems:'center',gap:4,backgroundColor:'#EDF9F1',borderRadius:8,paddingHorizontal:7,paddingVertical:5,marginTop:3},promoText:{fontSize: 10,fontFamily: font.black,color:colors.green},netPrice:{fontSize:10,fontFamily: font.extraBold,color:colors.green,marginTop:2},
   sideCategoryWrap: { marginTop: 6, paddingLeft: 10 },
-  sideCategoryName: { fontSize: 12, fontWeight: '800', color: colors.muted },
+  sideCategoryName: { fontSize: 12, fontFamily: font.extraBold, color: colors.muted },
   sideItem: { fontSize: 12, color: colors.text, marginLeft: 6, marginTop: 2 },
   noteRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingLeft: 10 },
   noteText: { fontSize: 12, color: colors.muted, fontStyle: 'italic' },
   infoRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  infoLabel: { fontSize: 11, fontWeight: '800', color: colors.muted },
-  infoValue: { fontSize: 13, fontWeight: '800', color: colors.text, marginTop: 2, lineHeight: 18 },
+  infoLabel: { fontSize: 11, fontFamily: font.extraBold, color: colors.muted },
+  infoValue: { fontSize: 13, fontFamily: font.extraBold, color: colors.text, marginTop: 2, lineHeight: 18 },
   infoValueSub: { fontSize: 11, color: colors.muted, marginTop: 1 },
   infoDivider: { height: 1, backgroundColor: colors.border, marginVertical: 12 },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
   totalLabel: { fontSize: 13, color: colors.muted },
-  totalValue: { fontSize: 13, fontWeight: '800', color: colors.text },
+  totalValue: { fontSize: 13, fontFamily: font.extraBold, color: colors.text },
   totalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 8 },
-  grandTotalLabel: { fontSize: 15, fontWeight: '900', color: colors.text },
-  grandTotalValue: { fontSize: 18, fontWeight: '900', color: colors.brown },
+  grandTotalLabel: { fontSize: 15, fontFamily: font.black, color: colors.text },
+  grandTotalValue: { fontSize: 18, fontFamily: font.black, color: colors.brown },
   paymentMethodBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border },
-  paymentMethodText: { fontSize: 11, color: colors.muted, fontWeight: '700' },
+  paymentMethodText: { fontSize: 11, color: colors.muted, fontFamily: font.bold },
   driverCard: { backgroundColor: 'white', borderRadius: 20, padding: 16, flexDirection: 'row', gap: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  driverTitle: { fontSize: 11, fontWeight: '800', color: colors.muted },
-  driverName: { fontSize: 14, fontWeight: '900', color: colors.text, marginTop: 2 },footer:{position:'absolute',left:0,right:0,bottom:0,padding:14,backgroundColor:'white',borderTopWidth:1,borderTopColor:colors.border},reorderButton:{height:52,borderRadius:16,backgroundColor:colors.yellow,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},reorderButtonText:{fontSize:14,fontWeight:'900',color:colors.brown},
+  driverTitle: { fontSize: 11, fontFamily: font.extraBold, color: colors.muted },
+  driverName: { fontSize: 14, fontFamily: font.black, color: colors.text, marginTop: 2 },footer:{position:'absolute',left:0,right:0,bottom:0,padding:14,backgroundColor:'white',borderTopWidth:1,borderTopColor:colors.border},reorderButton:{height:52,borderRadius:16,backgroundColor:colors.yellow,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:8},reorderButtonText:{fontSize:14,fontFamily: font.black,color:colors.brown},
 });

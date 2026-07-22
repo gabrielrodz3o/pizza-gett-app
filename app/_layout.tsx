@@ -3,6 +3,9 @@ import { focusManager, QueryClient } from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import * as Sentry from '@sentry/react-native';
+import { useFonts } from 'expo-font';
+import { BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
+import { Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, Montserrat_800ExtraBold, Montserrat_900Black } from '@expo-google-fonts/montserrat';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
@@ -12,7 +15,9 @@ import { colors } from '@/shared/theme';
 import { getValidCustomerAccessToken, useCustomerAuth } from '@/features/auth/store';
 import { appConfig } from '@/shared/config';
 import { bindOnlineManager, ConnectivityBanner } from '@/shared/components/ConnectivityBanner';
+import { ConfirmSheetHost } from '@/shared/components/ConfirmSheet';
 import { PizzaGettoSplash } from '@/shared/components/PizzaGettoSplash';
+import { AppToast } from '@/shared/components/Toast';
 
 Sentry.init({dsn:appConfig.sentryDsn,enabled:Boolean(appConfig.sentryDsn),environment:appConfig.environment,sendDefaultPii:false,tracesSampleRate:appConfig.environment==='production'?0.15:1});
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry:(count,error:any)=>!error?.response&&count<2,staleTime:60_000,gcTime:24*60*60_000,refetchOnMount:true,refetchOnReconnect:true,refetchOnWindowFocus:true,networkMode:'offlineFirst' },mutations:{networkMode:'online'} } });
@@ -21,6 +26,10 @@ const persister=createAsyncStoragePersister({storage:AsyncStorage,key:'pizza-get
 function Layout() {
   const [showSplash, setShowSplash] = useState(true);
   const finishSplash = useCallback(() => setShowSplash(false), []);
+  const [fontsLoaded] = useFonts({
+    BebasNeue_400Regular,
+    Montserrat_500Medium, Montserrat_600SemiBold, Montserrat_700Bold, Montserrat_800ExtraBold, Montserrat_900Black,
+  });
   useEffect(() => {
     void useCustomerAuth.getState().restore();
     const unbindNetwork=bindOnlineManager();
@@ -39,7 +48,9 @@ function Layout() {
         <StatusBar style="light" />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.cream } }} />
         <ConnectivityBanner />
-        {showSplash && <PizzaGettoSplash onFinish={finishSplash} />}
+        <AppToast />
+        <ConfirmSheetHost />
+        {(showSplash || !fontsLoaded) && <PizzaGettoSplash onFinish={finishSplash} />}
       </PersistQueryClientProvider>
     </SafeAreaProvider>
   );

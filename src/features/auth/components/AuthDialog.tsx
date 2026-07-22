@@ -16,7 +16,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCustomerAuth } from '@/features/auth/store';
 import { requestPhoneOtp, signInWithProviderToken, verifyPhoneOtp } from '@/features/customer/api';
-import { colors } from '@/shared/theme';
+import { toast } from '@/shared/components/Toast';
+import { haptics } from '@/shared/haptics';
+import { colors, font } from '@/shared/theme';
 import { GoogleSignInButton } from './GoogleSignInButton';
 
 export function AuthDialog({ visible, onClose }: { visible: boolean; onClose: () => void }) {
@@ -50,8 +52,11 @@ export function AuthDialog({ visible, onClose }: { visible: boolean; onClose: ()
         return;
       }
       await signIn(session);
+      haptics.success();
+      toast(`¡Hola, ${session.profile?.name || 'de nuevo'}! Sesión iniciada.`);
       onClose();
     } catch {
+      haptics.error();
       setError('No pudimos iniciar con Google.');
     } finally {
       setLoading(false);
@@ -71,6 +76,7 @@ export function AuthDialog({ visible, onClose }: { visible: boolean; onClose: ()
       if (result.dev_code) setDevCode(result.dev_code);
       if (result.masked_name) setMaskedName(result.masked_name);
     } catch (e: any) {
+      haptics.error();
       setError(e?.response?.data?.statusMessage || e?.response?.data?.message || 'No pudimos enviar el código.');
     } finally {
       setLoading(false);
@@ -85,8 +91,11 @@ export function AuthDialog({ visible, onClose }: { visible: boolean; onClose: ()
     try {
       const session = await verifyPhoneOtp(challenge, code, name, linkToken || undefined);
       await signIn(session);
+      haptics.success();
+      toast(`¡Hola, ${session.profile?.name || 'de nuevo'}! Sesión iniciada.`);
       onClose();
     } catch (e: any) {
+      haptics.error();
       setError(e?.response?.data?.statusMessage || e?.response?.data?.message || 'Código incorrecto o expirado.');
     } finally {
       setLoading(false);
@@ -231,25 +240,25 @@ const s = StyleSheet.create({
     backgroundColor: 'white', alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: colors.border,
   },
-  brand: { fontSize: 13, fontWeight: '900', letterSpacing: 2, color: colors.orange },
-  title: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: colors.text, marginTop: 8 },
+  brand: { fontSize: 17, fontFamily: font.display, letterSpacing: 3, color: colors.orange },
+  title: { fontSize: 33, lineHeight: 36, fontFamily: font.display, letterSpacing: 0.4, color: colors.text, marginTop: 8 },
   subtitle: { fontSize: 14, lineHeight: 20, color: colors.muted, marginTop: 8, marginBottom: 22 },
   input: {
     height: 54, borderRadius: 16, backgroundColor: 'white',
     borderWidth: 1, borderColor: colors.border,
     paddingHorizontal: 16, fontSize: 15, color: colors.text, marginBottom: 10,
   },
-  otp: { fontSize: 26, textAlign: 'center', letterSpacing: 10, fontWeight: '900' },
+  otp: { fontSize: 26, textAlign: 'center', letterSpacing: 10, fontFamily: font.black },
   primary: { height: 54, borderRadius: 16, backgroundColor: colors.yellow, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   disabled: { opacity: 0.5 },
-  primaryText: { fontSize: 15, fontWeight: '900', color: colors.brown },
+  primaryText: { fontSize: 15, fontFamily: font.black, color: colors.brown },
   or: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 18 },
   line: { flex: 1, height: 1, backgroundColor: colors.border },
   orText: { fontSize: 11, color: colors.muted },
-  change: { textAlign: 'center', color: colors.orange, fontWeight: '800', marginTop: 16 },
+  change: { textAlign: 'center', color: colors.orange, fontFamily: font.extraBold, marginTop: 16 },
   error: { fontSize: 12, lineHeight: 18, color: colors.red, textAlign: 'center', marginTop: 14 },
   legal: { fontSize: 10, lineHeight: 14, color: colors.muted, textAlign: 'center', marginTop: 20 },
   devBanner: { backgroundColor: '#FEF9C3', borderRadius: 12, padding: 12, marginBottom: 12, alignItems: 'center', borderWidth: 1, borderColor: '#FDE047' },
-  devLabel: { fontSize: 11, color: '#713F12', fontWeight: '600', marginBottom: 2 },
-  devCode: { fontSize: 30, fontWeight: '900', letterSpacing: 8, color: '#78350F' },
+  devLabel: { fontSize: 11, color: '#713F12', fontFamily: font.semiBold, marginBottom: 2 },
+  devCode: { fontSize: 30, fontFamily: font.black, letterSpacing: 8, color: '#78350F' },
 });

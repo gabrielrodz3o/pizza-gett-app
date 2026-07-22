@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text } from 'react-native';
-import { colors } from '@/shared/theme';
+import { Platform, Pressable, StyleSheet, Text } from 'react-native';
+import { confirmSheet } from '@/shared/components/ConfirmSheet';
+import { colors, font } from '@/shared/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -43,10 +44,13 @@ function ConfiguredGoogleButton({ onToken, onError }: { onToken: (idToken: strin
 
 function FallbackGoogleButton() {
   const handlePress = () => {
-    Alert.alert(
-      'Google Client ID no configurado',
-      'Para habilitar el inicio de sesión con Google, debes colocar EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID en tu archivo .env'
-    );
+    confirmSheet({
+      title: 'Google Client ID no configurado',
+      message: 'Para habilitar el inicio de sesión con Google, debes colocar EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID en tu archivo .env',
+      icon: 'logo-google',
+      confirmText: 'Entendido',
+      cancelText: null,
+    });
   };
 
   return (
@@ -80,5 +84,5 @@ const s = StyleSheet.create({
   disabled: {
     opacity: 0.8,
   },
-  text: { fontSize: 15, fontWeight: '800', color: colors.text },
+  text: { fontSize: 15, fontFamily: font.extraBold, color: colors.text },
 });

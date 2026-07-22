@@ -1,8 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useCustomerAuth } from '@/features/auth/store';
-import { colors } from '@/shared/theme';
+import { confirmSheet } from '@/shared/components/ConfirmSheet';
+import { toast } from '@/shared/components/Toast';
+import { haptics } from '@/shared/haptics';
+import { colors, font } from '@/shared/theme';
 import { AddressesModal } from './AddressesModal';
 import { NotificationsModal } from './NotificationsModal';
 
@@ -14,7 +17,7 @@ export function ProfileContent({ branchName, supportPhone, onLogin, onChangeCont
   const [showNotifications, setShowNotifications] = useState(false);
 
   const comingSoon = (name: string) =>
-    Alert.alert(name, 'Esta función estará disponible próximamente. 🚀');
+    toast(`${name} estará disponible próximamente 🚀`, 'info');
 
   const requireAuth = (action: () => void) => {
     if (!auth.session) { onLogin(); return; }
@@ -45,19 +48,20 @@ export function ProfileContent({ branchName, supportPhone, onLogin, onChangeCont
     {
       icon: 'help-circle-outline',
       label: 'Ayuda y soporte',
-      onPress: () => supportPhone ? Alert.alert('Ayuda y soporte', `Comunícate con ${branchName.replace('Pizza Getto • ', '')}.`, [{ text:'Cancelar',style:'cancel' },{ text:'Llamar',onPress:()=>Linking.openURL(`tel:${supportPhone.replace(/\D/g, '')}`) }]) : Alert.alert('Ayuda y soporte','No encontramos el teléfono de esta sucursal.'),
+      onPress: () => supportPhone ? confirmSheet({ title: 'Ayuda y soporte', message: `Comunícate con ${branchName.replace('Pizza Getto • ', '')}.`, icon: 'call', confirmText: 'Llamar', onConfirm: () => Linking.openURL(`tel:${supportPhone.replace(/\D/g, '')}`) }) : toast('No encontramos el teléfono de esta sucursal.', 'error'),
     },
   ];
 
   const handleSignOut = () => {
-    Alert.alert(
-      'Cerrar sesión',
-      '¿Estás seguro de que quieres cerrar sesión?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Cerrar sesión', style: 'destructive', onPress: auth.signOut },
-      ],
-    );
+    haptics.warning();
+    confirmSheet({
+      title: 'Cerrar sesión',
+      message: '¿Estás seguro de que quieres cerrar sesión?',
+      icon: 'log-out',
+      confirmText: 'Cerrar sesión',
+      destructive: true,
+      onConfirm: auth.signOut,
+    });
   };
 
   return (
@@ -124,7 +128,7 @@ export function ProfileContent({ branchName, supportPhone, onLogin, onChangeCont
 }
 
 const s = StyleSheet.create({
-  title: { fontSize: 27, fontWeight: '900', color: colors.text },
+  title: { fontSize: 32, fontFamily: font.display, letterSpacing: 0.4, color: colors.text },
   subtitle: { fontSize: 15, color: colors.muted, marginTop: 3 },
   card: {
     backgroundColor: 'white', borderRadius: 20, padding: 16,
@@ -136,7 +140,7 @@ const s = StyleSheet.create({
     width: 52, height: 52, borderRadius: 18,
     backgroundColor: colors.yellowSoft, alignItems: 'center', justifyContent: 'center',
   },
-  name: { fontSize: 15, fontWeight: '900', color: colors.text },
+  name: { fontSize: 15, fontFamily: font.black, color: colors.text },
   description: { fontSize: 11, lineHeight: 15, color: colors.muted, marginTop: 4 },
   section: {
     backgroundColor: 'white', borderRadius: 20, overflow: 'hidden',
@@ -144,7 +148,7 @@ const s = StyleSheet.create({
   },
   row: { height: 60, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   rowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
-  rowLabel: { flex: 1, fontSize: 14, fontWeight: '700', color: colors.text },
+  rowLabel: { flex: 1, fontSize: 14, fontFamily: font.bold, color: colors.text },
   signOut: {
     backgroundColor: 'white', borderRadius: 20,
     borderWidth: 1, borderColor: colors.border,

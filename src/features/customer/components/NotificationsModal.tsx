@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEffect, useState } from 'react';
 import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '@/shared/theme';
+import { colors, font } from '@/shared/theme';
 
 type Props = { visible: boolean; onClose: () => void };
 
@@ -81,16 +81,16 @@ export function NotificationsModal({ visible, onClose }: Props) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.cream },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: 'white' },
-  headerTitle: { fontSize: 17, fontWeight: '900', color: colors.text },
+  headerTitle: { fontSize: 17, fontFamily: font.black, color: colors.text },
   content: { padding: 20, paddingBottom: 40 },
-  sectionTitle: { fontSize: 18, fontWeight: '900', color: colors.text, marginBottom: 6 },
+  sectionTitle: { fontSize: 18, fontFamily: font.black, color: colors.text, marginBottom: 6 },
   sectionSubtitle: { fontSize: 13, color: colors.muted, lineHeight: 19, marginBottom: 20 },
   card: { backgroundColor: 'white', borderRadius: 20, borderWidth: 1, borderColor: colors.border, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   rowBorder: { borderTopWidth: 1, borderTopColor: colors.border },
   iconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.yellowSoft, alignItems: 'center', justifyContent: 'center' },
   rowContent: { flex: 1 },
-  rowTitle: { fontSize: 14, fontWeight: '800', color: colors.text },
+  rowTitle: { fontSize: 14, fontFamily: font.extraBold, color: colors.text },
   rowDesc: { fontSize: 11, color: colors.muted, marginTop: 2, lineHeight: 16 },
   infoBox: { flexDirection: 'row', gap: 10, backgroundColor: 'white', borderRadius: 16, padding: 14, marginTop: 16, borderWidth: 1, borderColor: colors.border, alignItems: 'flex-start' },
   infoText: { flex: 1, fontSize: 12, color: colors.muted, lineHeight: 17 },

@@ -9,6 +9,7 @@ type State = {
   chooseService: (mode: 'delivery' | 'pickup', branchId: number, addressId?: string | null) => void;
   resetService: () => void;
   addCombo: (lines: CartLine[]) => void;
+  updateLine: (lineId: string, options: { selectedSides: SelectedSide[]; note?: string; quantity: number }) => void;
   increment: (lineId: string) => void; decrement: (lineId: string) => void; clear: () => void; toggleFavorite: (id: number) => void;
 };
 export const useShop = create<State>()(persist((set) => ({
@@ -27,6 +28,14 @@ export const useShop = create<State>()(persist((set) => ({
     return { cart: [...s.cart, { ...p, lineId, size: 'Única', quantity, note: options.note, selectedSides, unitTotal: p.price + sideTotal }] };
   }),
   addCombo: (lines) => set((s) => ({ cart: [...s.cart, ...lines] })),
+  updateLine: (lineId, options) => set((s) => ({
+    cart: s.cart.map((x) => {
+      if (x.lineId !== lineId || x.comboGroupId) return x;
+      const selectedSides = options.selectedSides ?? [];
+      const sideTotal = selectedSides.reduce((sum, side) => sum + side.price * side.quantity, 0);
+      return { ...x, selectedSides, note: options.note, quantity: Math.max(1, options.quantity || 1), unitTotal: x.price + sideTotal };
+    }),
+  })),
   increment: (lineId) => set((s) => {
     const target = s.cart.find((x) => x.lineId === lineId); const group = target?.comboGroupId;
     if (group) return { cart: s.cart };

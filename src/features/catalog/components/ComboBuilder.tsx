@@ -6,7 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getComboDefinition } from '@/features/catalog/api';
 import { ProductCustomization, ProductCustomizer } from './ProductCustomizer';
 import { useShop } from '@/features/cart/store';
-import { colors } from '@/shared/theme';
+import { toast } from '@/shared/components/Toast';
+import { haptics } from '@/shared/haptics';
+import { colors, font } from '@/shared/theme';
 import { Branch, CartLine, ComboOption, ComboSlot, Product } from '@/shared/types';
 
 type Selection = { slot: ComboSlot; option?: ComboOption; product?: Product; customization?: ProductCustomization; customized: boolean };
@@ -35,6 +37,7 @@ export function ComboBuilder({ combo, branch, onClose, onFallback }: { combo: Pr
   const choose = (index: number, option: ComboOption) => {
     const product = query.data?.products.get(option.itemId);
     if (!product) return;
+    haptics.select();
     setSelections((current) => current.map((selection, i) => i === index ? { ...selection, option, product, customization: undefined, customized: !product.sidesCategories?.length } : selection));
     if (product.sidesCategories?.length) setCustomizing(index);
   };
@@ -61,7 +64,10 @@ export function ComboBuilder({ combo, branch, onClose, onFallback }: { combo: Pr
         comboGroupId: groupId, comboItemId: combo.id, comboName: combo.name, comboTaxTypeId: combo.taxTypeId, comboUnitId: combo.unitId,
       };
     });
-    addCombo(lines); onClose();
+    haptics.press();
+    addCombo(lines);
+    toast(`${combo.name} agregado al carrito`);
+    onClose();
   };
 
   if (!combo) return null;
@@ -85,5 +91,5 @@ export function ComboBuilder({ combo, branch, onClose, onFallback }: { combo: Pr
 }
 
 const s = StyleSheet.create({
-  screen:{flex:1,backgroundColor:colors.cream},header:{minHeight:70,padding:14,backgroundColor:colors.brown,flexDirection:'row',alignItems:'center',gap:10},icon:{width:42,height:42,borderRadius:14,backgroundColor:'white',alignItems:'center',justifyContent:'center'},kicker:{fontSize:10,fontWeight:'900',letterSpacing:1.3,color:colors.yellow},headerTitle:{fontSize:20,fontWeight:'900',color:'white'},content:{padding:16,paddingBottom:125},state:{flex:1,alignItems:'center',justifyContent:'center',gap:12,padding:25},muted:{color:colors.muted},error:{fontWeight:'800',color:colors.red,textAlign:'center'},retry:{backgroundColor:colors.yellow,borderRadius:14,paddingHorizontal:20,paddingVertical:12},slot:{backgroundColor:'white',borderRadius:19,padding:14,marginBottom:12,borderWidth:1,borderColor:colors.border},slotHead:{flexDirection:'row',alignItems:'center',gap:11,marginBottom:8},number:{width:34,height:34,borderRadius:12,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center'},done:{backgroundColor:colors.green},numberText:{fontWeight:'900',color:colors.brown},slotName:{fontSize:16,fontWeight:'900',color:colors.text},rule:{fontSize:11,color:colors.muted,marginTop:2},option:{minHeight:58,borderRadius:14,padding:11,marginTop:7,backgroundColor:colors.cream,flexDirection:'row',alignItems:'center',gap:10,borderWidth:1,borderColor:'transparent'},optionSelected:{backgroundColor:colors.yellowSoft,borderColor:colors.yellow},disabled:{opacity:.42},optionName:{fontSize:14,fontWeight:'800',color:colors.text},summary:{fontSize:11,color:colors.muted,marginTop:3},delta:{fontSize:11,fontWeight:'800',color:colors.brown},footer:{position:'absolute',left:0,right:0,bottom:0,padding:16,backgroundColor:'white',borderTopWidth:1,borderTopColor:colors.border},pending:{fontSize:11,color:colors.red,textAlign:'center',marginBottom:7},confirm:{height:55,borderRadius:16,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center'},confirmDisabled:{opacity:.45},buttonText:{fontSize:15,fontWeight:'900',color:colors.brown},
+  screen:{flex:1,backgroundColor:colors.cream},header:{minHeight:70,padding:14,backgroundColor:colors.brown,flexDirection:'row',alignItems:'center',gap:10},icon:{width:42,height:42,borderRadius:14,backgroundColor:'white',alignItems:'center',justifyContent:'center'},kicker:{fontSize:10,fontFamily: font.black,letterSpacing:1.3,color:colors.yellow},headerTitle:{fontSize:24,fontFamily:font.display,letterSpacing:.5,color:'white'},content:{padding:16,paddingBottom:125},state:{flex:1,alignItems:'center',justifyContent:'center',gap:12,padding:25},muted:{color:colors.muted},error:{fontFamily: font.extraBold,color:colors.red,textAlign:'center'},retry:{backgroundColor:colors.yellow,borderRadius:14,paddingHorizontal:20,paddingVertical:12},slot:{backgroundColor:'white',borderRadius:19,padding:14,marginBottom:12,borderWidth:1,borderColor:colors.border},slotHead:{flexDirection:'row',alignItems:'center',gap:11,marginBottom:8},number:{width:34,height:34,borderRadius:12,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center'},done:{backgroundColor:colors.green},numberText:{fontFamily: font.black,color:colors.brown},slotName:{fontSize:16,fontFamily: font.black,color:colors.text},rule:{fontSize:11,color:colors.muted,marginTop:2},option:{minHeight:58,borderRadius:14,padding:11,marginTop:7,backgroundColor:colors.cream,flexDirection:'row',alignItems:'center',gap:10,borderWidth:1,borderColor:'transparent'},optionSelected:{backgroundColor:colors.yellowSoft,borderColor:colors.yellow},disabled:{opacity:.42},optionName:{fontSize:14,fontFamily: font.extraBold,color:colors.text},summary:{fontSize:11,color:colors.muted,marginTop:3},delta:{fontSize:11,fontFamily: font.extraBold,color:colors.brown},footer:{position:'absolute',left:0,right:0,bottom:0,padding:16,backgroundColor:'white',borderTopWidth:1,borderTopColor:colors.border},pending:{fontSize:11,color:colors.red,textAlign:'center',marginBottom:7},confirm:{height:55,borderRadius:16,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center'},confirmDisabled:{opacity:.45},buttonText:{fontSize:15,fontFamily: font.black,color:colors.brown},
 });
