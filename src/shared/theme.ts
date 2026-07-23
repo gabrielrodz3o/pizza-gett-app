@@ -1,5 +1,6 @@
+// Marrón #481918 y amarillo #FFC100 extraídos del logo oficial (gettopizza.com).
 export const colors = {
-  brown: '#4A1F1F', brownDark: '#2F1111', yellow: '#F5A900', gold: '#FFC400', yellowSoft: '#FFF2CF',
+  brown: '#481918', brownDark: '#2F1010', yellow: '#FFC100', gold: '#FFC100', yellowSoft: '#FFF2CF',
   cream: '#F7F5F3', white: '#FFFFFF', text: '#241818', muted: '#766968', border: '#E9E1DC',
   green: '#2E9E5B', red: '#D83A3A', orange: '#F07A27',
 };

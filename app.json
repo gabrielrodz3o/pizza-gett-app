@@ -10,7 +10,7 @@
     "icon": "./assets/brand/icon-ios-light.png",
     "splash": { "backgroundColor": "#3F1516", "image": "./assets/brand/pizza-getto-logo.png", "resizeMode": "contain" },
     "ios": { "supportsTablet": true, "bundleIdentifier": "com.pizzagetto.app", "usesAppleSignIn": true, "icon": { "light": "./assets/brand/icon-ios-light.png", "dark": "./assets/brand/icon-ios-dark.png", "tinted": "./assets/brand/icon-ios-tinted.png" }, "config": { "googleMapsApiKey": "AIzaSyDEu5aO7pMaGfHDtdLYiE440ScftgY2gJY" }, "infoPlist": { "NSLocationWhenInUseUsageDescription": "Usamos tu ubicación para colocar tu dirección dentro de nuestra zona de delivery." } },
-    "android": { "package": "com.pizzagetto.app", "config": { "googleMaps": { "apiKey": "AIzaSyDEu5aO7pMaGfHDtdLYiE440ScftgY2gJY" } }, "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"], "adaptiveIcon": { "foregroundImage": "./assets/brand/icon-android-foreground.png", "monochromeImage": "./assets/brand/icon-android-monochrome.png", "backgroundColor": "#4A1F1F" } },
+    "android": { "package": "com.pizzagetto.app", "config": { "googleMaps": { "apiKey": "AIzaSyDEu5aO7pMaGfHDtdLYiE440ScftgY2gJY" } }, "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"], "adaptiveIcon": { "foregroundImage": "./assets/brand/icon-android-foreground.png", "monochromeImage": "./assets/brand/icon-android-monochrome.png", "backgroundColor": "#481918" } },
     "plugins": ["expo-router", "expo-secure-store", "expo-apple-authentication", ["expo-splash-screen", { "backgroundColor": "#3F1516", "image": "./assets/brand/pizza-getto-logo.png", "imageWidth": 220 }]],
     "experiments": { "typedRoutes": true },
     "extra": {
