@@ -1,0 +1,19 @@
+TIPOGRAFIA DE MARCA — PIZZA GETTO
+=================================
+
+BEBAS NEUE (display)
+  La voz de la marca. Usar en titulares, precios destacados y momentos de impacto.
+  Siempre en mayusculas. Tracking amplio (+2 a +4) en palabras sueltas.
+
+MONTSERRAT (interfaz y lectura)
+  Todo lo que se lee: botones, parrafos, formularios, etiquetas.
+  Pesos incluidos: Regular 400 · Medium 500 · SemiBold 600 · Bold 700 · ExtraBold 800 · Black 900.
+
+INSTALACION
+  macOS: doble clic en el .ttf -> "Instalar fuente".
+  Windows: clic derecho en el .ttf -> "Instalar".
+
+LICENCIA
+  Ambas familias son de Google Fonts bajo licencia SIL Open Font License (OFL):
+  uso comercial, impresion y web permitidos sin costo.
+  https://fonts.google.com/specimen/Bebas+Neue · https://fonts.google.com/specimen/Montserrat

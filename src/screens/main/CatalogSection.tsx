@@ -63,6 +63,13 @@ export function CatalogSection({
   onOpenProduct: (product: Product) => void;
 }) {
   const shown = products;
+  const isBrowsingCatalog = Boolean(campaignItemIds) || category !== 'Todos' || search.trim().length > 0;
+  const visibleProducts = tab === 'home' && !isBrowsingCatalog
+    ? (shown.some((product) => product.popular)
+        ? shown.filter((product) => product.popular)
+        : shown
+      ).slice(0, 4)
+    : shown;
   return (
     <>
       {tab === 'home' && campaigns.length > 0 && <OfferCarousel campaigns={campaigns} onSelect={onSelectCampaign} />}
@@ -123,11 +130,15 @@ export function CatalogSection({
         <Text style={s.sectionTitle}>
           {campaignItemIds ? (shown.length === 1 ? 'Tu producto en oferta' : 'Productos de esta oferta') : category === 'Favoritos'
             ? 'Tus favoritos'
+            : category !== 'Todos'
+              ? category
+              : search.trim()
+                ? 'Resultados de búsqueda'
             : tab === 'home'
               ? 'Los más pedidos'
               : 'Nuestro menú'}
         </Text>
-        {tab === 'home' && (
+        {tab === 'home' && !isBrowsingCatalog && (
           <Pressable onPress={onSeeAll}>
             <Text style={s.link}>Ver todo</Text>
           </Pressable>
@@ -173,13 +184,7 @@ export function CatalogSection({
         />
       ) : (
         <View style={s.grid}>
-          {(tab === 'home'
-            ? (shown.filter((x) => x.popular).length
-                ? shown.filter((x) => x.popular)
-                : shown
-              ).slice(0, 4)
-            : shown
-          ).map((p) => (
+          {visibleProducts.map((p) => (
             <ProductCard
               key={p.id}
               product={p}

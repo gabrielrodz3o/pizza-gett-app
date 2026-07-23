@@ -1,0 +1,42 @@
+================================================================
+  PIZZA GETTO — PAQUETE DE MARCA · v1.0 · 2026
+================================================================
+
+Contenido de esta entrega:
+
+01-Logo/
+   PNG-Fondo-Transparente/  Logo original (458 px) y versión 2x (916 px)
+   PNG-Sobre-Fondos/        Logo compuesto sobre marrón, amarillo, crema y gradiente
+   Icono-de-App/            Íconos 1024x1024 px listos para App Store y Google Play
+   * Para impresión de gran formato (vallas, rotulación) solicitar el
+     archivo vectorial (AI/SVG) al autor original del logo.
+
+02-Colores/
+   paleta-pizza-getto.png   Lámina visual de la paleta
+   colores.md               Tabla con HEX, RGB y uso de cada color
+
+03-Tipografia/
+   Bebas-Neue/              Fuente display (titulares y precios)
+   Montserrat/              Fuente de interfaz (6 pesos)
+   LEEME-TIPOGRAFIA.txt     Cómo instalar y licencia (Google Fonts / OFL)
+
+04-Manual-de-Marca/
+   Pizza-Getto-Manual-de-Marca.pdf   8 páginas: logo, usos incorrectos,
+   color, tipografía, voz, fotografía y aplicaciones.
+
+05-Diseno-de-la-App/
+   Pizza-Getto-Diseno-App.pdf        Presentación de diseño UI/UX (10 páginas):
+   sistema de diseño, componentes y todas las pantallas de la aplicación.
+
+06-Brochure-Comercial/
+   Pizza-Getto-Brochure.pdf          Brochure de producto (4 páginas) para
+   presentar la app a socios e inversionistas.
+
+07-Fotografia-de-Producto/
+   Las 5 fotos oficiales del menú (Tripleroni, Gettona, Vegetariana,
+   Super Meats, Mexicana) usadas en la app y el material de marca.
+
+----------------------------------------------------------------
+Regla de oro: si un uso de la marca no está contemplado en el
+manual, consultar antes de publicar.
+================================================================

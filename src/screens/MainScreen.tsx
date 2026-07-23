@@ -100,6 +100,16 @@ export default function App() {
       (category === "Todos" || (category === 'Ofertas' ? (campaignItemIds ? campaignItemIds.includes(x.id) : Boolean(x.promotion)) : category === 'Favoritos' ? shop.favorites.includes(x.id) : x.category === category)) &&
       `${x.name} ${x.description}`.toLowerCase().includes(search.toLowerCase()),
   );
+  const productOrder = new Map(products.map((product, index) => [product.id, index]));
+  const orderedFiltered = [...filtered].sort((a, b) => {
+    const aPromo = Boolean(a.promotion);
+    const bPromo = Boolean(b.promotion);
+    if (aPromo !== bPromo) return aPromo ? -1 : 1;
+    const aPopular = Boolean(a.popular);
+    const bPopular = Boolean(b.popular);
+    if (aPopular !== bPopular) return aPopular ? -1 : 1;
+    return (productOrder.get(a.id) ?? 0) - (productOrder.get(b.id) ?? 0);
+  });
   const comboGroups = new Set(
     shop.cart.flatMap((x) => (x.comboGroupId ? [x.comboGroupId] : [])),
   );
@@ -261,7 +271,7 @@ export default function App() {
             search={search}
             category={category}
             categories={categories}
-            products={filtered}
+            products={orderedFiltered}
             loading={query.isLoading}
             error={query.isError}
             menuAvailability={menuAvailability}
